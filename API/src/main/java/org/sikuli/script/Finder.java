@@ -686,9 +686,16 @@ public class Finder implements Iterator<Match> {
      */
     private static int getSystemDpi() {
       try {
-        return Toolkit.getDefaultToolkit().getScreenResolution();
+        java.awt.GraphicsDevice gd = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+            .getDefaultScreenDevice();
+        double scale = gd.getDefaultConfiguration().getDefaultTransform().getScaleX();
+        return (int) Math.round(96 * scale);
       } catch (Exception e) {
-        return 96; // valeur par defaut
+        try {
+          return Toolkit.getDefaultToolkit().getScreenResolution();
+        } catch (Exception e2) {
+          return 96; // valeur par defaut
+        }
       }
     }
 
@@ -697,12 +704,25 @@ public class Finder implements Iterator<Match> {
      * Retourne 1.0 si pas de difference ou si les DPI ne sont pas disponibles.
      */
     private static double getDpiRatio(FindInput2 findInput) {
-      Image targetImg = findInput.getTargetImage();
-      int templateDpi = getDpiFromImage(targetImg);
-      if (templateDpi <= 0) {
-        return 1.0;
-      }
       int screenDpi = getSystemDpi();
+      int templateDpi = -1;
+
+      // 1. In-memory DPI from Image object (set at capture time)
+      Image targetImg = findInput.getTargetImage();
+      if (targetImg != null && targetImg.getCaptureDpi() > 0) {
+        templateDpi = targetImg.getCaptureDpi();
+      }
+
+      // 2. Fallback: read DPI from PNG metadata (pHYs chunk)
+      if (templateDpi <= 0) {
+        templateDpi = getDpiFromImage(targetImg);
+      }
+
+      // 3. Fallback: assume 96 DPI (legacy templates, 100% scaling)
+      if (templateDpi <= 0) {
+        templateDpi = 96;
+      }
+
       if (screenDpi == templateDpi) {
         return 1.0;
       }
@@ -885,6 +905,7 @@ public class Finder implements Iterator<Match> {
       }
 
       // --- MODE 3 : tolerant match (flou gaussien) ---
+      double originalScore = findInput.getScore();
       if (findResult == null && !findInput.isFindAll() && !findInput.hasMask()) {
         begin_lap = new Date().getTime();
         Mat whatBlur = new Mat();
@@ -893,8 +914,9 @@ public class Finder implements Iterator<Match> {
         Imgproc.GaussianBlur(findWhere, whereBlur, new Size(3, 3), 0);
         mResult = doFindMatch(whatBlur, whereBlur, findInput);
         mMinMax = Core.minMaxLoc(mResult);
-        double tolerantScore = findInput.getScore() * 0.9;
+        double tolerantScore = originalScore * 0.9;
         if (mMinMax.maxVal > tolerantScore) {
+          findInput.setSimilarity(tolerantScore);
           findResult = new FindResult2(mResult, findInput);
           log.trace("OculiX Mode 3 tolerant: match %%%.4f (seuil=%%%.4f) %d msec",
               mMinMax.maxVal * 100, tolerantScore * 100, new Date().getTime() - begin_lap);
@@ -914,8 +936,9 @@ public class Finder implements Iterator<Match> {
           Mat mResultGray = Commons.getNewMat();
           Imgproc.matchTemplate(whereGray, whatGray, mResultGray, Imgproc.TM_CCOEFF_NORMED);
           mMinMax = Core.minMaxLoc(mResultGray);
-          double smartScore = findInput.getScore() * 0.85;
+          double smartScore = originalScore * 0.85;
           if (mMinMax.maxVal > smartScore) {
+            findInput.setSimilarity(smartScore);
             findResult = new FindResult2(mResultGray, findInput);
             log.trace("OculiX Mode 4 smart: match %%%.4f (seuil=%%%.4f) %d msec",
                 mMinMax.maxVal * 100, smartScore * 100, new Date().getTime() - begin_lap);
@@ -925,6 +948,37 @@ public class Finder implements Iterator<Match> {
         }
         whatGray.release();
         whereGray.release();
+      }
+      // --- MODE 5 : multi-scale brute-force (dernier recours) ---
+      if (findResult == null && !findInput.isFindAll() && !findInput.hasMask()) {
+        double[] commonScales = {1.25, 1.5, 1.75, 2.0, 0.8, 0.67, 0.5};
+        double multiScaleScore = originalScore * 0.9;
+        begin_lap = new Date().getTime();
+        for (double scale : commonScales) {
+          Mat mScaled = new Mat();
+          Imgproc.resize(findInput.getTarget(), mScaled, new Size(),
+              scale, scale, Imgproc.INTER_LINEAR);
+          if (mScaled.width() > findWhere.width() || mScaled.height() > findWhere.height()) {
+            mScaled.release();
+            continue;
+          }
+          mResult = doFindMatch(mScaled, findWhere, findInput);
+          mMinMax = Core.minMaxLoc(mResult);
+          if (mMinMax.maxVal > multiScaleScore) {
+            findInput.setSimilarity(multiScaleScore);
+            findResult = new FindResult2(mResult, findInput);
+            log.trace("OculiX Mode 5 multi-scale: match %%%.4f (scale=%.2f) %d msec",
+                mMinMax.maxVal * 100, scale, new Date().getTime() - begin_lap);
+            mScaled.release();
+            break;
+          }
+          mScaled.release();
+        }
+      }
+
+      // Restaurer le seuil original si aucun mode degrade n'a matche
+      if (findResult == null) {
+        findInput.setSimilarity(originalScore);
       }
 
       // ========================================================
