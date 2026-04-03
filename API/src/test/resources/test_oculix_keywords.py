@@ -160,7 +160,11 @@ try:
     if paddle.isAvailable():
         testImg = s.capture(window)
         testPath = testImg.getFile(tmpdir, "debug_paddle")
-        print("PaddleOCR: sending image " + testPath)
+        print("PaddleOCR: captured image " + testPath)
+        print("PaddleOCR: image exists = " + str(os.path.exists(testPath)))
+        print("PaddleOCR: image size = " + str(os.path.getsize(testPath)) + " bytes")
+        print("PaddleOCR: window region = " + str(window))
+
         rawJson = paddle.getClient().recognize(testPath)
         print("PaddleOCR raw response: " + str(rawJson)[:500])
         testTexts = paddle.getClient().recognizeAndParseTexts(testPath)
