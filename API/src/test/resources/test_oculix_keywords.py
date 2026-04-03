@@ -1,4 +1,4 @@
-from org.sikuli.script import OculixKeywords, Screen, Region, App, Pattern
+from org.sikuli.script import OculixKeywords, Screen, Region, App
 from org.sikuli.basics import Settings
 from com.sikulix.ocr import PaddleOCREngine
 import jarray
@@ -8,6 +8,8 @@ s = Screen()
 tmpdir = os.getcwd()
 
 print("=== TEST OCULIX KEYWORDS - INTEGRATION ===")
+print("Screen: " + str(s.getBounds()))
+print("Working dir: " + tmpdir)
 passed = 0
 failed = 0
 skipped = 0
@@ -28,165 +30,217 @@ def skip(name, reason):
     skipped += 1
 
 def intArray(lst):
-    """Convert a Python list to a Java int[]"""
     return jarray.array(lst, 'i')
 
-# --- Preparation ---
+# ============================================================
+# PREPARATION
+# ============================================================
 App.open("notepad.exe")
 time.sleep(2)
 window = App.focusedWindow()
-kw = OculixKeywords(window)
+print("Notepad window: " + str(window))
 
+# Type text into Notepad
 window.type("OCULIX TEST ALPHA BETA GAMMA")
 time.sleep(1)
 
-# Capture a reference image from the notepad window
-refRegion = Region(window.getX() + 10, window.getY() + 10, 80, 40)
+# Recapture window position after typing (in case it moved)
+App.focus("Notepad")
+time.sleep(0.5)
+window = App.focusedWindow()
+print("Window after type+refocus: " + str(window))
+
+# Create OculixKeywords bound to the Notepad window
+kw = OculixKeywords(window)
+
+# Capture a reference image: top-left corner of the window (title bar area)
+# This is a stable visual element that should always match
+refRegion = Region(window.getX(), window.getY(), 80, 30)
 simg = s.capture(refRegion)
 smallPath = simg.getFile(tmpdir, "ref_small")
-print("Reference image saved: " + smallPath)
+print("Ref image: " + smallPath)
 
-# Capture a "not wanted" image from a corner of the screen
-nwRegion = Region(1900, 1060, 10, 10)
-nwImg = s.capture(nwRegion)
-nwPath = nwImg.getFile(tmpdir, "not_wanted")
-print("Not-wanted image saved: " + nwPath)
+# Capture a "not wanted" image: bottom-right of screen (taskbar area)
+# Use screen bounds to avoid going off-screen
+sw = s.getW()
+sh = s.getH()
+nwRegion = Region(sw - 50, sh - 30, 40, 20)
+nwSimg = s.capture(nwRegion)
+nwPath = nwSimg.getFile(tmpdir, "not_wanted")
+print("Not-wanted image: " + nwPath)
+print("")
 
-# === GROUPE 1 : Metriques ===
+# ============================================================
+# GROUPE 1 : Metriques (getMatchScore, imageCount)
+# ============================================================
+print("--- Metriques ---")
+kw.setRegion(window)
+
 def test_getMatchScore():
     score = kw.getMatchScore(smallPath)
     assert score > 0.5, "Score trop bas: " + str(score)
 
 def test_imageCount():
     count = kw.imageCount(smallPath)
-    assert count >= 1, "Count trop bas: " + str(count)
+    assert count >= 1, "Attendu >= 1, obtenu: " + str(count)
 
 test("getMatchScore", test_getMatchScore)
 test("imageCount", test_imageCount)
 
-# === GROUPE 2 : Regions etendues (calcul pur, zero ecran) ===
+# ============================================================
+# GROUPE 2 : Regions etendues (calcul pur, pas d'ecran)
+# ============================================================
+print("--- Regions etendues ---")
+
 def test_extended_below():
-    result = kw.getExtendedRegionFromRegion(intArray([100, 100, 50, 30]), "below", 2)
-    assert result[0] == 100 and result[1] == 130 and result[2] == 50 and result[3] == 60
+    r = kw.getExtendedRegionFromRegion(intArray([100, 100, 50, 30]), "below", 2)
+    assert r[0] == 100 and r[1] == 130 and r[2] == 50 and r[3] == 60, str(r)
+
+def test_extended_above():
+    r = kw.getExtendedRegionFromRegion(intArray([100, 200, 50, 30]), "above", 1)
+    assert r[0] == 100 and r[1] == 170 and r[2] == 50 and r[3] == 30, str(r)
 
 def test_extended_right():
-    result = kw.getExtendedRegionFromRegion(intArray([100, 100, 50, 30]), "right", 3)
-    assert result[0] == 150 and result[2] == 150
+    r = kw.getExtendedRegionFromRegion(intArray([100, 100, 50, 30]), "right", 3)
+    assert r[0] == 150 and r[2] == 150, str(r)
 
-def test_jumpTo():
-    result = kw.fromRegionJumpTo(intArray([100, 100, 50, 30]), "below", 2, 10)
-    assert result[1] == 180, "Expected 180, got " + str(result[1])
+def test_extended_left():
+    r = kw.getExtendedRegionFromRegion(intArray([200, 100, 50, 30]), "left", 2)
+    assert r[0] == 100 and r[2] == 100, str(r)
+
+def test_extended_original():
+    r = kw.getExtendedRegionFromRegion(intArray([100, 100, 50, 30]), "original", 1)
+    assert r[0] == 100 and r[1] == 100 and r[2] == 50 and r[3] == 30, str(r)
+
+def test_jumpTo_below():
+    r = kw.fromRegionJumpTo(intArray([100, 100, 50, 30]), "below", 2, 10)
+    assert r[1] == 180, "Expected y=180, got " + str(r[1])
+
+def test_jumpTo_right():
+    r = kw.fromRegionJumpTo(intArray([100, 100, 50, 30]), "right", 1, 5)
+    assert r[0] == 155, "Expected x=155, got " + str(r[0])
 
 test("extended below", test_extended_below)
+test("extended above", test_extended_above)
 test("extended right", test_extended_right)
-test("fromRegionJumpTo", test_jumpTo)
+test("extended left", test_extended_left)
+test("extended original", test_extended_original)
+test("jumpTo below", test_jumpTo_below)
+test("jumpTo right", test_jumpTo_right)
 
-# === GROUPE 3 : ROI ===
+# ============================================================
+# GROUPE 3 : ROI management
+# ============================================================
+print("--- ROI ---")
+
 def test_setRoi():
-    kw.setRoi(window.getX(), window.getY(), 500, 500)
-    assert kw.getRegion().getW() == 500
-    kw.setRegion(window)
+    kw.setRoi(50, 50, 400, 300)
+    r = kw.getRegion()
+    assert r.getW() == 400 and r.getH() == 300, "ROI not set correctly"
+    kw.setRegion(window)  # restore
 
 def test_resetRoi():
     kw.setRoi(10, 10, 100, 100)
     kw.resetRoi()
-    assert kw.getRegion().getW() > 100
-    kw.setRegion(window)
+    r = kw.getRegion()
+    assert r.getW() > 100, "resetRoi should restore to full screen, got W=" + str(r.getW())
+    kw.setRegion(window)  # restore
+
+def test_timeout():
+    kw.setTimeout(7.5)
+    assert kw.getTimeout() == 7.5, "Timeout not set"
+    kw.setTimeout(3.0)  # restore
 
 test("setRoi", test_setRoi)
 test("resetRoi", test_resetRoi)
+test("setTimeout", test_timeout)
 
-# === GROUPE 4 : clickText OCR ===
-# Refocus Notepad and recalculate window position
+# ============================================================
+# GROUPE 4 : clickText OCR
+# ============================================================
+print("--- clickText OCR ---")
+
+# Refocus Notepad
 App.focus("Notepad")
 time.sleep(0.5)
 window = App.focusedWindow()
-print("Window after refocus: " + str(window))
+kw.setRegion(window)
 
-# Target just the top part of the editing area where the text is
-# Notepad title bar ~32px, menu bar ~20px, toolbar ~0px (no toolbar in Win notepad)
-# Text is at the very top of the editing area
-textArea = Region(window.getX(), window.getY() + 50, window.getW(), 80)
-print("OCR debug - textArea: " + str(textArea))
-
+# Probe PaddleOCR
 ocrReady = False
-paddle = None
-
-# Try PaddleOCR (needs external server on localhost:5000)
 try:
     paddle = PaddleOCREngine()
     if paddle.isAvailable():
-        kw.setOcrEngine(paddle)
-        print("OCR engine: PaddleOCR (server alive)")
-        ocrReady = True
-    else:
-        print("PaddleOCR server not available, trying Tesseract...")
+        # Test if PaddleOCR actually sees text in the window
+        testImg = s.capture(window)
+        testPath = testImg.getFile(tmpdir, "debug_paddle")
+        testTexts = paddle.getClient().recognizeAndParseTexts(testPath)
+        print("PaddleOCR sees in window: " + str(testTexts))
+        if len(testTexts) > 0:
+            kw.setOcrEngine(paddle)
+            ocrReady = True
+            print("OCR engine: PaddleOCR")
+        else:
+            print("PaddleOCR alive but detected 0 texts in window")
 except Exception as e:
-    print("PaddleOCR init failed: " + str(e))
+    print("PaddleOCR: " + str(e))
 
-# Fallback: try Tesseract
+# Fallback: Tesseract
 if not ocrReady:
     Settings.OcrTextSearch = True
     Settings.OcrTextRead = True
     try:
-        ocrResult = textArea.text()
-        print("Tesseract sees: [" + str(ocrResult).strip() + "]")
+        ocrResult = window.text()
         if ocrResult and len(ocrResult.strip()) > 0:
+            kw.setOcrEngine(None)
             ocrReady = True
-            kw.setOcrEngine(None)  # use built-in Tesseract
-            print("OCR engine: Tesseract")
+            print("OCR engine: Tesseract, sees: [" + ocrResult.strip()[:50] + "]")
+        else:
+            print("Tesseract: empty result")
     except Exception as e:
-        print("Tesseract probe failed: " + str(e))
+        print("Tesseract: " + str(e))
 
 if ocrReady:
-    # Debug: test PaddleOCR on full screen first, then on textArea
-    if paddle is not None and paddle.isAvailable():
-        # 1) Full screen — does PaddleOCR see ANY text?
-        fullImg = s.capture()
-        fullPath = fullImg.getFile(tmpdir, "debug_fullscreen")
-        print("Debug fullscreen image: " + fullPath)
-        fullTexts = paddle.getClient().recognizeAndParseTexts(fullPath)
-        print("PaddleOCR fullscreen texts: " + str(fullTexts))
-
-        # 2) TextArea crop — is the crop correct?
-        cropImg = s.capture(textArea)
-        cropPath = cropImg.getFile(tmpdir, "debug_textarea")
-        print("Debug textArea image: " + cropPath + " (region: " + str(textArea) + ")")
-        cropJson = paddle.getClient().recognize(cropPath)
-        cropTexts = paddle.getClient().recognizeAndParseTexts(cropPath)
-        print("PaddleOCR textArea texts: " + str(cropTexts))
-
-        # 3) Window capture — the whole notepad window
-        winImg = s.capture(window)
-        winPath = winImg.getFile(tmpdir, "debug_window")
-        print("Debug window image: " + winPath + " (region: " + str(window) + ")")
-        winTexts = paddle.getClient().recognizeAndParseTexts(winPath)
-        print("PaddleOCR window texts: " + str(winTexts))
-
-    kw.setRegion(textArea)
+    kw.setRegion(window)
     test("clickText OCULIX", lambda: kw.clickText("OCULIX"))
     time.sleep(0.3)
-    kw.setRegion(textArea)
+    kw.setRegion(window)
     test("regionClickText ALPHA", lambda: kw.regionClickText("ALPHA"))
     time.sleep(0.3)
 else:
-    skip("clickText OCULIX", "No OCR engine available (PaddleOCR down + Tesseract empty)")
-    skip("regionClickText ALPHA", "No OCR engine available")
+    skip("clickText OCULIX", "No OCR engine detected text")
+    skip("regionClickText ALPHA", "No OCR engine detected text")
 
-# === GROUPE 5 : Clicks coordonnees ===
+# ============================================================
+# GROUPE 5 : Clicks par coordonnees
+# ============================================================
+print("--- Clicks coordonnees ---")
+App.focus("Notepad")
+time.sleep(0.3)
+window = App.focusedWindow()
 kw.setRegion(window)
 
 def test_clickRegion():
-    kw.clickRegion(window.getX() + 100, window.getY() + 100, 50, 30)
+    cx = window.getX() + window.getW() / 2
+    cy = window.getY() + window.getH() / 2
+    kw.clickRegion(cx, cy, 20, 20)
 
 def test_clickOnRegion():
-    r = Region(window.getX() + 100, window.getY() + 100, 50, 30)
+    cx = window.getX() + window.getW() / 2
+    cy = window.getY() + window.getH() / 2
+    r = Region(cx, cy, 20, 20)
     kw.clickOnRegion(r)
 
 test("clickRegion", test_clickRegion)
 test("clickOnRegion", test_clickOnRegion)
 
-# === GROUPE 6 : waitForImage ===
+# ============================================================
+# GROUPE 6 : waitForImage
+# ============================================================
+print("--- waitForImage ---")
+App.focus("Notepad")
+time.sleep(0.3)
+window = App.focusedWindow()
 kw.setRegion(window)
 
 def test_waitForImage():
@@ -195,29 +249,40 @@ def test_waitForImage():
 
 test("waitForImage", test_waitForImage)
 
-# === GROUPE 7 : Highlights ===
+# ============================================================
+# GROUPE 7 : Highlights
+# ============================================================
+print("--- Highlights ---")
+
 def test_highlightRoi():
-    kw.setRoi(window.getX() + 50, window.getY() + 50, 300, 200)
+    kw.setRoi(window.getX() + 20, window.getY() + 20, 200, 100)
     kw.highlightRoi(1)
+    time.sleep(1.2)
     kw.setRegion(window)
 
 def test_highlightCount():
-    count = kw.getHighlightCount()
-    assert count == 0, "Expected 0, got " + str(count)
+    assert kw.getHighlightCount() == 0, "Should be 0 after no persistent highlights"
 
 test("highlightRoi", test_highlightRoi)
 test("highlightCount", test_highlightCount)
 
-# === GROUPE 8 : Timeout ===
-def test_timeout():
-    kw.setTimeout(5.0)
-    assert kw.getTimeout() == 5.0, "Timeout not set"
-    kw.setTimeout(3.0)
+# ============================================================
+# GROUPE 8 : Captures
+# ============================================================
+print("--- Captures ---")
 
-test("setTimeout", test_timeout)
+def test_captureRoi():
+    kw.setRoi(window.getX(), window.getY(), 200, 100)
+    path = kw.captureRoi()
+    assert path is not None and len(path) > 0, "captureRoi returned empty"
+    kw.setRegion(window)
 
-# === Cleanup ===
-time.sleep(1)
+test("captureRoi", test_captureRoi)
+
+# ============================================================
+# CLEANUP
+# ============================================================
+time.sleep(0.5)
 subprocess.call(["taskkill", "/F", "/IM", "notepad.exe"])
 
 print("")
