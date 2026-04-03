@@ -102,6 +102,7 @@ textArea = Region(window.getX() + 5, window.getY() + 85, window.getW() - 30, win
 print("OCR debug - textArea: " + str(textArea))
 
 ocrReady = False
+paddle = None
 
 # Try PaddleOCR (needs external server on localhost:5000)
 try:
@@ -131,6 +132,15 @@ if not ocrReady:
 
 if ocrReady:
     kw.setRegion(textArea)
+    # Debug: manually test PaddleOCR pipeline before clickText
+    if paddle is not None and paddle.isAvailable():
+        debugImg = s.capture(textArea)
+        debugPath = debugImg.getFile(tmpdir, "debug_ocr")
+        print("Debug OCR image: " + debugPath)
+        debugJson = paddle.getClient().recognize(debugPath)
+        print("PaddleOCR raw JSON: " + str(debugJson)[:500])
+        debugTexts = paddle.getClient().recognizeAndParseTexts(debugPath)
+        print("PaddleOCR detected texts: " + str(debugTexts))
     test("clickText OCULIX", lambda: kw.clickText("OCULIX"))
     time.sleep(0.3)
     kw.setRegion(textArea)
