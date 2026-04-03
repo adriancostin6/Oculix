@@ -123,12 +123,7 @@ public class OculixKeywords {
           + " occurrences found for '" + locator + "'");
     }
     Match match = matches.get(index);
-    try {
-      match.click();
-    } catch (FindFailed e) {
-      throw new ScreenOperationException(
-          "Click on occurrence " + index + " of '" + locator + "' failed", e);
-    }
+    match.click();
     return MatchUtils.regionFromMatch(match);
   }
 
