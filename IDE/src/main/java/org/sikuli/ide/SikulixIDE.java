@@ -1083,8 +1083,8 @@ public class SikulixIDE extends JFrame {
         try {
           _file.createNewFile();
         } catch (IOException e) {
-          fatal("PaneContext: setFile: create not possible: %s", file); //TODO
-          _file = null;
+          log("PaneContext: setFile: create not possible: %s", _file);
+          return false;
         }
       }
       if (_file == null) {
