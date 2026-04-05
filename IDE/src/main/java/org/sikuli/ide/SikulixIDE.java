@@ -806,6 +806,15 @@ public class SikulixIDE extends JFrame {
   }
 
   public File selectFileToOpen() {
+    // Set initial directory to workspace or last script location
+    if (currentWorkspaceDir != null) {
+      PreferencesUser.get().put("LAST_OPEN_DIR", currentWorkspaceDir.getAbsolutePath());
+    } else {
+      PaneContext ctx = getActiveContext();
+      if (ctx != null && ctx.getFolder() != null) {
+        PreferencesUser.get().put("LAST_OPEN_DIR", ctx.getFolder().getParentFile().getAbsolutePath());
+      }
+    }
     File fileSelected = new SikulixFileChooser(sikulixIDE).open();
     if (fileSelected == null) {
       return null;
@@ -1868,6 +1877,13 @@ public class SikulixIDE extends JFrame {
     chooser.setDialogTitle("Open Workspace");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
+    // Start in workspace dir or last known location
+    if (currentWorkspaceDir != null) {
+      chooser.setCurrentDirectory(currentWorkspaceDir.getParentFile());
+    } else {
+      String lastDir = PreferencesUser.get().get("LAST_OPEN_DIR", "");
+      if (!lastDir.isEmpty()) chooser.setCurrentDirectory(new File(lastDir));
+    }
     int result = chooser.showOpenDialog(ideWindow);
     if (result == JFileChooser.APPROVE_OPTION) {
       loadWorkspace(chooser.getSelectedFile());
