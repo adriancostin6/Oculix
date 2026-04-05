@@ -1056,12 +1056,14 @@ public class SikulixIDE extends JFrame {
           if (_file != null) {
             _ext = FilenameUtils.getExtension(_file.getPath());
           } else {
+            // No script file found in bundle — create one with default extension
             _ext = IDESupport.getDefaultRunner().getDefaultExtension();
+            _file = new File(_folder, _name + "." + _ext);
             try {
               _file.createNewFile();
             } catch (IOException e) {
-              fatal("PaneContext: setFile: create not possible: %s", file); //TODO
-              _file = null;
+              log("PaneContext: setFile: create not possible: %s", _file);
+              return false;
             }
           }
         } else {
@@ -1998,10 +2000,9 @@ public class SikulixIDE extends JFrame {
     if (sikuliDirs != null) {
       for (File script : sikuliDirs) {
         try {
-          // Check that the .sikuli bundle contains a script file
-          String baseName = script.getName().replace(".sikuli", "");
-          File pyFile = new File(script, baseName + ".py");
-          if (pyFile.exists()) {
+          // Check that the .sikuli bundle contains at least one .py file
+          File[] pyFiles = script.listFiles((d, name) -> name.endsWith(".py"));
+          if (pyFiles != null && pyFiles.length > 0) {
             createFileContext(script);
           } else {
             log("Workspace: skipping %s (no .py file found)", script.getName());
@@ -2011,6 +2012,8 @@ public class SikulixIDE extends JFrame {
         }
       }
     }
+
+    refreshWorkspace();
 
     log("Workspace loaded: %s (%s)", currentWorkspaceName, dir.getAbsolutePath());
   }
