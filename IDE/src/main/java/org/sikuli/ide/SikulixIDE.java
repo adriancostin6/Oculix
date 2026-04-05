@@ -889,6 +889,12 @@ public class SikulixIDE extends JFrame {
   }
 
   public File selectFileForSave(PaneContext context) {
+    // Set initial directory to workspace or script location
+    if (currentWorkspaceDir != null) {
+      PreferencesUser.get().put("LAST_OPEN_DIR", currentWorkspaceDir.getAbsolutePath());
+    } else if (context.getFolder() != null && context.getFolder().getParentFile() != null) {
+      PreferencesUser.get().put("LAST_OPEN_DIR", context.getFolder().getParentFile().getAbsolutePath());
+    }
     File fileSelected = new SikulixFileChooser(sikulixIDE).saveAs(
             context.getExt(), context.isBundle() || context.isTemp());
     if (fileSelected == null) {
@@ -1394,6 +1400,10 @@ public class SikulixIDE extends JFrame {
         contextsClosed.add(0, this);
         tabs.setTitleAt(pos, newContext.name);
         sikulixIDE.setIDETitle(newContext.file.getAbsolutePath());
+        sikulixIDE.refreshWorkspace();
+        if (sikulixIDE.sidebar != null) {
+          sikulixIDE.sidebar.updateProjectInfo(newContext.getFileName(), newContext.getFolder());
+        }
       }
       return success;
     }
