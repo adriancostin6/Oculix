@@ -494,7 +494,7 @@ public class SikulixIDE extends JFrame {
 
   // Phase 1b: build sidebar submenus from existing menu actions
   private void initSidebarNavigation() {
-    SidebarSubmenu fileSub = buildSubmenuFrom(_fileMenu);
+    SidebarSubmenu fileSub = buildFileSubmenu();
     SidebarSubmenu editSub = buildSubmenuFrom(_editMenu);
     SidebarSubmenu runSub = buildRunSubmenu();
     SidebarSubmenu toolsSub = buildToolsSubmenu();
@@ -504,6 +504,65 @@ public class SikulixIDE extends JFrame {
 
   // Items that require an open script to be functional
   private java.util.List<JMenuItem> scriptDependentItems = new ArrayList<>();
+
+  private SidebarSubmenu buildFileSubmenu() {
+    SidebarSubmenu sub = new SidebarSubmenu();
+    int scMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+
+    // ── Nouveau ──
+    JMenuItem newHeader = new JMenuItem("\u2500\u2500 " + _I("menuFileNew") + " \u2500\u2500");
+    newHeader.setEnabled(false);
+    newHeader.setFont(UIManager.getFont("defaultFont").deriveFont(Font.BOLD, 11f));
+    sub.add(newHeader);
+    sub.addItem("\uD83D\uDCC4  Script",
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, scMask),
+        e -> { createEmptyScriptContext(); });
+    sub.addItem("\uD83D\uDCC1  Workspace", null,
+        e -> openNewWorkspaceDialog());
+
+    // ── Ouvrir ──
+    JMenuItem openHeader = new JMenuItem("\u2500\u2500 " + _I("menuFileOpen") + " \u2500\u2500");
+    openHeader.setEnabled(false);
+    openHeader.setFont(UIManager.getFont("defaultFont").deriveFont(Font.BOLD, 11f));
+    sub.add(openHeader);
+    sub.addItem("\uD83D\uDCC4  Script",
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_O, scMask),
+        e -> { File f = selectFileToOpen(); if (f != null) createFileContext(f); });
+    sub.addItem("\uD83D\uDCC1  Workspace", null,
+        e -> openExistingWorkspace());
+
+    sub.addSeparator();
+
+    // Enregistrer
+    scriptDependentItems.add(sub.addItem(_I("menuFileSave"),
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, scMask),
+        e -> { PaneContext ctx = getActiveContext(); if (ctx != null) ctx.save(); }));
+    scriptDependentItems.add(sub.addItem(_I("menuFileSaveAs"),
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK | scMask),
+        e -> { PaneContext ctx = getActiveContext(); if (ctx != null) ctx.saveAs(); }));
+    scriptDependentItems.add(sub.addItem(_I("menuFileExport"),
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E, InputEvent.SHIFT_DOWN_MASK | scMask),
+        e -> { exportAsZip(); }));
+
+    sub.addSeparator();
+
+    scriptDependentItems.add(sub.addItem(_I("menuFileCloseTab"),
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W, scMask),
+        e -> { PaneContext ctx = getActiveContext(); if (ctx != null) ctx.close(); }));
+
+    sub.addSeparator();
+
+    sub.addItem(_I("menuFilePreferences"),
+        KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P, scMask),
+        e -> showPreferencesWindow());
+
+    sub.addSeparator();
+
+    sub.addItem(_I("menuFileQuit"), null,
+        e -> terminate());
+
+    return sub;
+  }
 
   private SidebarSubmenu buildRunSubmenu() {
     SidebarSubmenu sub = new SidebarSubmenu();
