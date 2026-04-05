@@ -6,7 +6,6 @@ package org.sikuli.ide;
 import java.awt.*;
 import javax.swing.*;
 
-import com.explodingpixels.macwidgets.plaf.EmphasizedLabelUI;
 import org.sikuli.support.Commons;
 
 import java.util.Date;
@@ -24,21 +23,16 @@ class SikuliIDEStatusBar extends JPanel {
     setLayout(new BorderLayout());
     setPreferredSize(new Dimension(10, 20));
 
-    JPanel rightPanel = new JPanel(new BorderLayout());
-    rightPanel.setOpaque(false);
     _lblMsg = new JLabel();
     _lblMsg.setPreferredSize(new Dimension(500, 20));
-    _lblMsg.setUI(new EmphasizedLabelUI());
-    _lblMsg.setFont(new Font("Monaco", Font.TRUETYPE_FONT, 11));
+    _lblMsg.setFont(UIManager.getFont("Label.font").deriveFont(11.0f));
     _lblCaretPos = new JLabel();
     _lblCaretPos.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 15));
-    _lblCaretPos.setUI(new EmphasizedLabelUI());
-    _lblCaretPos.setFont(UIManager.getFont("Button.font").deriveFont(11.0f));
+    _lblCaretPos.setFont(UIManager.getFont("Label.font").deriveFont(11.0f));
     setCaretPosition(1, 1);
     resetMessage();
     add(_lblMsg, BorderLayout.WEST);
     add(_lblCaretPos, BorderLayout.LINE_END);
-//    add(rightPanel, BorderLayout.EAST);
   }
 
   public void setType(String contentType) {
