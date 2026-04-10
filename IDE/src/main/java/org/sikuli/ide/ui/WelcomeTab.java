@@ -41,7 +41,7 @@ public class WelcomeTab extends JPanel {
     JPanel headerPanel = new JPanel(new MigLayout("wrap 1, insets 0", "[center]"));
     headerPanel.setOpaque(false);
 
-    URL iconUrl = getClass().getResource("/icons/sikulix-red.png");
+    URL iconUrl = getClass().getResource("/icons/oculix-ide.png");
     if (iconUrl != null) {
       ImageIcon logo = new ImageIcon(iconUrl);
       int targetWidth = 280;

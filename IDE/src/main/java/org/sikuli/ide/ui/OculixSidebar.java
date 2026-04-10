@@ -90,9 +90,9 @@ public class OculixSidebar extends JPanel {
     logoBox.setBackground(UIManager.getColor("Panel.background"));
     logoBox.setBorder(BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor"), 1));
 
-    JLabel logoLine1 = new JLabel("OculiX", SwingConstants.CENTER);
-    logoLine1.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 30));
-    logoLine1.setForeground(new Color(0xE0, 0x60, 0x30)); // SikuliX-style orange/red
+    JLabel logoLine1 = new JLabel("OCULIX", SwingConstants.CENTER);
+    logoLine1.setFont(new Font("SansSerif", Font.BOLD, 30));
+    logoLine1.setForeground(new Color(0x00, 0xA8, 0x9D)); // OculiX teal
     logoBox.add(logoLine1, "align center");
 
     JLabel logoLine2 = new JLabel("I D E", SwingConstants.CENTER);
