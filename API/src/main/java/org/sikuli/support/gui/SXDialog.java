@@ -1800,6 +1800,7 @@ public class SXDialog extends JFrame {
         lblText = new UnderlinedLabel(title(), font);
       }
       lblText.setFont(font);
+      lblText.setForeground(SXRED);
       Rectangle r = new Rectangle(0, 0, (int) textLen.getWidth(), (int) textLen.getHeight());
       lblText.setBounds(r);
       dim(r.getSize());
