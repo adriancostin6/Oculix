@@ -209,64 +209,77 @@ public class RecorderAssistant extends JDialog {
     btnPause.addActionListener(e -> handlePause());
   }
 
+  // ── Capture helpers ──
+
+  /**
+   * Hide IDE + recorder, run capture, then show everything again.
+   * Follows the same pattern as legacy ButtonRecord.
+   */
+  private void hideForCapture() {
+    setVisible(false);
+    getOwner().setVisible(false);
+  }
+
+  private void showAfterCapture() {
+    getOwner().setVisible(true);
+    setVisible(true);
+  }
+
   // ── Image capture workflows ──
 
   private void handleImageCapture(String actionType) {
     if (!workflow.startCapture(actionType)) return;
 
-    // Hide dialog during capture so it doesn't block the overlay
-    setVisible(false);
+    hideForCapture();
 
-    SwingUtilities.invokeLater(() -> {
-      try {
-        ScreenImage capture = new Screen().userCapture("Select region to " + actionType);
-        setVisible(true);
+    new Thread(() -> {
+      ScreenImage capture = new Screen().userCapture("Select region to " + actionType);
+
+      SwingUtilities.invokeLater(() -> {
+        showAfterCapture();
 
         if (capture == null) {
-          setVisible(true);
           workflow.reset();
           return;
         }
 
-        // Save screenshot
-        String imagePath = capture.save(screenshotDir.getAbsolutePath());
-        if (imagePath == null) {
+        try {
+          String imagePath = capture.save(screenshotDir.getAbsolutePath());
+          if (imagePath == null) {
+            workflow.reset();
+            RecorderNotifications.error("Failed to save screenshot");
+            return;
+          }
+
+          workflow.onCaptureComplete(); // -> WAITING_PATTERN_VALIDATION
+
+          // Validate pattern
+          PatternValidator.ValidationResult result = PatternValidator.validate(
+              new Screen().capture().getImage(), capture.getImage());
+
+          Pattern pattern = new Pattern(imagePath);
+          if (result.warning == PatternValidator.Warning.AMBIGUOUS) {
+            pattern = pattern.similar((float) result.suggestedSimilarity);
+            RecorderNotifications.warning(
+                "Pattern matches " + result.matchCount + " locations. Similarity raised to " + result.suggestedSimilarity);
+          } else if (result.warning == PatternValidator.Warning.COLOR_DEPENDENT) {
+            RecorderNotifications.warning("Pattern depends on colors. May break with theme changes.");
+          } else if (result.warning == PatternValidator.Warning.TOO_SMALL) {
+            RecorderNotifications.warning("Pattern too small. Consider capturing a larger area.");
+          } else if (result.matchCount > 0) {
+            RecorderNotifications.success("Pattern validated (score: " + String.format("%.2f", result.bestScore) + ")");
+          }
+
+          String code = generateImageCode(actionType, pattern);
+          codePreview.addLine(code);
+          workflow.onActionComplete(); // -> IDLE
+
+        } catch (Exception ex) {
           workflow.reset();
-          RecorderNotifications.error("Failed to save screenshot");
-          return;
+          RecorderNotifications.error("Capture failed: " + ex.getMessage());
         }
-
-        workflow.onCaptureComplete(); // -> WAITING_PATTERN_VALIDATION
-
-        // Validate pattern
-        String imageName = new File(imagePath).getName();
-        PatternValidator.ValidationResult result = PatternValidator.validate(
-            new Screen().capture().getImage(), capture.getImage());
-
-        // Generate code based on action type and validation
-        Pattern pattern = new Pattern(imagePath);
-        if (result.warning == PatternValidator.Warning.AMBIGUOUS) {
-          pattern = pattern.similar((float) result.suggestedSimilarity);
-          RecorderNotifications.warning(
-              "Pattern matches " + result.matchCount + " locations. Similarity raised to " + result.suggestedSimilarity);
-        } else if (result.warning == PatternValidator.Warning.COLOR_DEPENDENT) {
-          RecorderNotifications.warning("Pattern depends on colors. May break with theme changes.");
-        } else if (result.warning == PatternValidator.Warning.TOO_SMALL) {
-          RecorderNotifications.warning("Pattern too small. Consider capturing a larger area.");
-        } else if (result.matchCount > 0) {
-          RecorderNotifications.success("Pattern validated (score: " + String.format("%.2f", result.bestScore) + ")");
-        }
-
-        String code = generateImageCode(actionType, pattern);
-        codePreview.addLine(code);
-        workflow.onActionComplete(); // -> IDLE
-
-      } catch (Exception ex) {
-        setVisible(true);
-        workflow.reset();
-        RecorderNotifications.error("Capture failed: " + ex.getMessage());
-      }
-    });
+      });
+    }, "RecorderCapture").start();
   }
 
   private String generateImageCode(String actionType, Pattern pattern) {
@@ -288,84 +301,86 @@ public class RecorderAssistant extends JDialog {
   private void handleDragDrop() {
     if (!workflow.startDragDrop()) return;
 
-    setVisible(false);
+    hideForCapture();
 
-    SwingUtilities.invokeLater(() -> {
-      try {
-        // Step 1: capture source
-        ScreenImage sourceCapture = new Screen().userCapture("Select DRAG SOURCE");
-        if (sourceCapture == null) {
-          setVisible(true);
-          workflow.reset();
-          return;
-        }
-        String sourcePath = sourceCapture.save(screenshotDir.getAbsolutePath());
-        workflow.advanceDragDrop(); // SOURCE -> DESTINATION
+    new Thread(() -> {
+      // Step 1: capture source
+      ScreenImage sourceCapture = new Screen().userCapture("Select DRAG SOURCE");
+      if (sourceCapture == null) {
+        SwingUtilities.invokeLater(() -> { showAfterCapture(); workflow.reset(); });
+        return;
+      }
+      workflow.advanceDragDrop(); // SOURCE -> DESTINATION
 
-        // Step 2: capture destination
-        ScreenImage destCapture = new Screen().userCapture("Select DROP DESTINATION");
-        setVisible(true);
+      // Step 2: capture destination
+      ScreenImage destCapture = new Screen().userCapture("Select DROP DESTINATION");
+
+      SwingUtilities.invokeLater(() -> {
+        showAfterCapture();
 
         if (destCapture == null) {
           workflow.reset();
           return;
         }
-        String destPath = destCapture.save(screenshotDir.getAbsolutePath());
 
-        Pattern sourcePattern = new Pattern(sourcePath);
-        Pattern destPattern = new Pattern(destPath);
-        String code = codeGenerator.dragDrop(sourcePattern, destPattern);
-        codePreview.addLine(code);
-        workflow.onActionComplete();
-        RecorderNotifications.success("Drag & Drop recorded");
+        try {
+          String sourcePath = sourceCapture.save(screenshotDir.getAbsolutePath());
+          String destPath = destCapture.save(screenshotDir.getAbsolutePath());
 
-      } catch (Exception ex) {
-        setVisible(true);
-        workflow.reset();
-        RecorderNotifications.error("Drag & Drop failed: " + ex.getMessage());
-      }
-    });
+          Pattern sourcePattern = new Pattern(sourcePath);
+          Pattern destPattern = new Pattern(destPath);
+          String code = codeGenerator.dragDrop(sourcePattern, destPattern);
+          codePreview.addLine(code);
+          workflow.onActionComplete();
+          RecorderNotifications.success("Drag & Drop recorded");
+        } catch (Exception ex) {
+          workflow.reset();
+          RecorderNotifications.error("Drag & Drop failed: " + ex.getMessage());
+        }
+      });
+    }, "RecorderDragDrop").start();
   }
 
   private void handleWheelCapture() {
     if (!workflow.startCapture("wheel")) return;
 
-    setVisible(false);
+    hideForCapture();
 
-    SwingUtilities.invokeLater(() -> {
-      try {
-        ScreenImage capture = new Screen().userCapture("Select region for wheel action");
-        setVisible(true);
+    new Thread(() -> {
+      ScreenImage capture = new Screen().userCapture("Select region for wheel action");
+
+      SwingUtilities.invokeLater(() -> {
+        showAfterCapture();
 
         if (capture == null) {
           workflow.reset();
           return;
         }
 
-        String imagePath = capture.save(screenshotDir.getAbsolutePath());
-        Pattern pattern = new Pattern(imagePath);
+        try {
+          String imagePath = capture.save(screenshotDir.getAbsolutePath());
+          Pattern pattern = new Pattern(imagePath);
 
-        // Ask direction and steps
-        String[] options = {"Down", "Up"};
-        int dir = JOptionPane.showOptionDialog(this, "Wheel direction?",
-            "Wheel", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-            null, options, options[0]);
-        if (dir < 0) { workflow.reset(); return; }
+          // Ask direction and steps
+          String[] options = {"Down", "Up"};
+          int dir = JOptionPane.showOptionDialog(this, "Wheel direction?",
+              "Wheel", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+              null, options, options[0]);
+          if (dir < 0) { workflow.reset(); return; }
 
-        String stepsStr = JOptionPane.showInputDialog(this, "Number of steps:", "3");
-        if (stepsStr == null) { workflow.reset(); return; }
-        int steps = Integer.parseInt(stepsStr.trim());
+          String stepsStr = JOptionPane.showInputDialog(this, "Number of steps:", "3");
+          if (stepsStr == null) { workflow.reset(); return; }
+          int steps = Integer.parseInt(stepsStr.trim());
 
-        String code = codeGenerator.wheel(pattern, dir == 0 ? 1 : -1, steps, new String[0], 0);
-        codePreview.addLine(code);
-        workflow.onActionComplete();
-
-      } catch (Exception ex) {
-        setVisible(true);
-        workflow.reset();
-        RecorderNotifications.error("Wheel failed: " + ex.getMessage());
-      }
-    });
+          String code = codeGenerator.wheel(pattern, dir == 0 ? 1 : -1, steps, new String[0], 0);
+          codePreview.addLine(code);
+          workflow.onActionComplete();
+        } catch (Exception ex) {
+          workflow.reset();
+          RecorderNotifications.error("Wheel failed: " + ex.getMessage());
+        }
+      });
+    }, "RecorderWheel").start();
   }
 
   // ── Text OCR workflows ──
@@ -373,47 +388,47 @@ public class RecorderAssistant extends JDialog {
   private void handleTextCapture(String actionType) {
     if (!workflow.startCapture(actionType)) return;
 
-    setVisible(false);
+    hideForCapture();
 
-    SwingUtilities.invokeLater(() -> {
-      try {
-        ScreenImage capture = new Screen().userCapture("Select region for OCR");
-        setVisible(true);
+    new Thread(() -> {
+      ScreenImage capture = new Screen().userCapture("Select region for OCR");
+
+      SwingUtilities.invokeLater(() -> {
+        showAfterCapture();
 
         if (capture == null) {
           workflow.reset();
           return;
         }
 
-        // Save temp image for OCR
-        String imagePath = capture.save(screenshotDir.getAbsolutePath());
-        workflow.onCaptureComplete(); // -> WAITING_OCR
+        try {
+          String imagePath = capture.save(screenshotDir.getAbsolutePath());
+          workflow.onCaptureComplete(); // -> WAITING_OCR
 
-        // OCR in SwingWorker (can take up to 35s)
-        new SwingWorker<String, Void>() {
-          @Override
-          protected String doInBackground() {
-            return ocrEngine.recognize(imagePath);
-          }
-
-          @Override
-          protected void done() {
-            try {
-              String json = get();
-              handleOcrResult(json, actionType);
-            } catch (Exception e) {
-              RecorderNotifications.error("OCR error: " + e.getMessage());
-              workflow.reset();
+          // OCR in SwingWorker (can take up to 35s)
+          new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() {
+              return ocrEngine.recognize(imagePath);
             }
-          }
-        }.execute();
 
-      } catch (Exception ex) {
-        setVisible(true);
-        workflow.reset();
-        RecorderNotifications.error("OCR capture failed: " + ex.getMessage());
-      }
-    });
+            @Override
+            protected void done() {
+              try {
+                String json = get();
+                handleOcrResult(json, actionType);
+              } catch (Exception e) {
+                RecorderNotifications.error("OCR error: " + e.getMessage());
+                workflow.reset();
+              }
+            }
+          }.execute();
+        } catch (Exception ex) {
+          workflow.reset();
+          RecorderNotifications.error("OCR capture failed: " + ex.getMessage());
+        }
+      });
+    }, "RecorderOCR").start();
   }
 
   private void handleOcrResult(String json, String actionType) {
@@ -520,24 +535,24 @@ public class RecorderAssistant extends JDialog {
   // ── Insert generated code into editor ──
 
   private void insertAndClose() {
-    // Get all generated code lines
-    StringBuilder code = new StringBuilder();
     DefaultListModel<String> model = (DefaultListModel<String>) codePreview.getModel();
+    if (model.isEmpty()) {
+      workflow.dispose();
+      dispose();
+      return;
+    }
+
+    // Build code string
+    StringBuilder code = new StringBuilder("\n");
     for (int i = 0; i < model.size(); i++) {
       code.append(model.get(i)).append("\n");
     }
 
-    if (code.length() > 0) {
-      // Insert into the active editor pane
-      Frame parent = (Frame) getOwner();
-      if (parent instanceof javax.swing.JFrame) {
-        // Copy to clipboard for easy paste
-        java.awt.datatransfer.StringSelection selection =
-            new java.awt.datatransfer.StringSelection(code.toString());
-        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
-        RecorderNotifications.success("Code copied to clipboard. Paste with Ctrl+V.");
-      }
-    }
+    // Copy to clipboard as fallback
+    java.awt.datatransfer.StringSelection selection =
+        new java.awt.datatransfer.StringSelection(code.toString());
+    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
+    RecorderNotifications.success("Code copied to clipboard. Paste with Ctrl+V.");
 
     workflow.dispose();
     dispose();
