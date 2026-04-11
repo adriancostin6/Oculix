@@ -4,6 +4,7 @@
 package org.sikuli.ide.ui.recorder;
 
 import net.miginfocom.swing.MigLayout;
+import org.sikuli.ide.SikulixIDE;
 import org.sikuli.script.*;
 import org.sikuli.support.recorder.PatternValidator;
 import org.sikuli.support.recorder.generators.JythonCodeGenerator;
@@ -465,7 +466,7 @@ public class RecorderAssistant extends JDialog {
     DefaultListModel<String> model = (DefaultListModel<String>) codePreview.getModel();
     if (model.isEmpty()) {
       workflow.dispose();
-      getOwner().setVisible(true); // Restore IDE
+      getOwner().setVisible(true);
       dispose();
       return;
     }
@@ -475,15 +476,49 @@ public class RecorderAssistant extends JDialog {
     for (int i = 0; i < model.size(); i++) {
       code.append(model.get(i)).append("\n");
     }
+    String codeStr = code.toString();
+
+    // Ask: insert in current script or new script?
+    String[] options = {"Current Script", "New Script", "Cancel"};
+    int choice = JOptionPane.showOptionDialog(this,
+        "Insert " + model.size() + " line(s) of generated code:",
+        "Insert Code",
+        JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+        null, options, options[0]);
+
+    if (choice == 2 || choice < 0) {
+      return; // Cancel — stay in recorder
+    }
 
     // Copy to clipboard
     java.awt.datatransfer.StringSelection selection =
-        new java.awt.datatransfer.StringSelection(code.toString());
+        new java.awt.datatransfer.StringSelection(codeStr);
     Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
 
     workflow.dispose();
-    getOwner().setVisible(true); // Restore IDE
-    RecorderNotifications.success("Code copied to clipboard. Paste with Ctrl+V.");
+    SikulixIDE ide = (SikulixIDE) getOwner();
+    ide.setVisible(true); // Restore IDE
+
+    if (choice == 1) {
+      // New script
+      ide.createEmptyScriptContext();
+    }
+
+    // Auto-paste into editor
+    java.awt.EventQueue.invokeLater(() -> {
+      try {
+        // Simulate Ctrl+V to paste into the active editor
+        java.awt.Robot robot = new java.awt.Robot();
+        robot.keyPress(java.awt.event.KeyEvent.VK_CONTROL);
+        robot.keyPress(java.awt.event.KeyEvent.VK_V);
+        robot.keyRelease(java.awt.event.KeyEvent.VK_V);
+        robot.keyRelease(java.awt.event.KeyEvent.VK_CONTROL);
+        RecorderNotifications.success(model.size() + " line(s) inserted.");
+      } catch (Exception ex) {
+        RecorderNotifications.info("Code in clipboard. Paste with Ctrl+V.");
+      }
+    });
+
     dispose();
   }
 
