@@ -68,10 +68,14 @@ public class RecorderAssistant extends JDialog {
       @Override
       public void windowClosing(WindowEvent e) {
         workflow.dispose();
+        getOwner().setVisible(true); // Restore IDE on close
       }
     });
 
     RecorderNotifications.init(parent);
+
+    // Hide IDE when recorder opens
+    parent.setVisible(false);
   }
 
   private void buildUI() {
@@ -212,16 +216,13 @@ public class RecorderAssistant extends JDialog {
   // ── Capture helpers ──
 
   /**
-   * Hide IDE + recorder, run capture, then show everything again.
-   * Follows the same pattern as legacy ButtonRecord.
+   * Hide recorder during capture (IDE is already hidden).
    */
   private void hideForCapture() {
     setVisible(false);
-    getOwner().setVisible(false);
   }
 
   private void showAfterCapture() {
-    getOwner().setVisible(true);
     setVisible(true);
   }
 
@@ -538,6 +539,7 @@ public class RecorderAssistant extends JDialog {
     DefaultListModel<String> model = (DefaultListModel<String>) codePreview.getModel();
     if (model.isEmpty()) {
       workflow.dispose();
+      getOwner().setVisible(true); // Restore IDE
       dispose();
       return;
     }
@@ -548,13 +550,14 @@ public class RecorderAssistant extends JDialog {
       code.append(model.get(i)).append("\n");
     }
 
-    // Copy to clipboard as fallback
+    // Copy to clipboard
     java.awt.datatransfer.StringSelection selection =
         new java.awt.datatransfer.StringSelection(code.toString());
     Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
-    RecorderNotifications.success("Code copied to clipboard. Paste with Ctrl+V.");
 
     workflow.dispose();
+    getOwner().setVisible(true); // Restore IDE
+    RecorderNotifications.success("Code copied to clipboard. Paste with Ctrl+V.");
     dispose();
   }
 
