@@ -137,6 +137,14 @@ public class Commons {
         runShutdownHook();
       }
     });
+
+    // Load OpenCV native library eagerly when Commons is initialized.
+    // Any class (Pattern, ScreenImage, PatternValidator, Finder, ...) that calls
+    // Commons.makeMat() / Commons.getNewMat() or creates new Mat() directly will
+    // then be safe, regardless of whether the Finder -> FindInput2 -> Finder2
+    // static-init chain has been triggered yet. Fixes UnsatisfiedLinkError on
+    // first new Mat() from non-Finder call paths (e.g. Pattern.patternMask field init).
+    loadOpenCV();
   }
 
   public static void init() {
