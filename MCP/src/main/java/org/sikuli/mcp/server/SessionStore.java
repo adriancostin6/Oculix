@@ -3,60 +3,101 @@
  */
 package org.sikuli.mcp.server;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Keeps track of active MCP sessions for the HTTP transport.
+ * Active MCP sessions for the HTTP transport.
  *
- * <p>The MCP Streamable HTTP spec surfaces sessions through the
- * {@code Mcp-Session-Id} header: the server emits it in the response to
- * {@code initialize}, and the client echoes it on every subsequent request.
+ * <p>A session is the triple {@code (sid, nonce, exp)} plus the mutable
+ * {@link SessionHandle} that the dispatcher reads from and writes to.
+ * The plaintext session bearer is <b>never</b> stored — only the
+ * {@code nonce} that the {@code TokenIssuer} embedded in the token
+ * payload. Verification compares nonces with {@link MessageDigest#isEqual}.
  *
- * <p>A {@code SessionStore} maps session ids to the mutable
- * {@link SessionHandle} that the dispatcher reads and writes. In stdio
- * mode a single handle is enough — this store is only needed when one
- * process serves concurrent clients.
+ * <p>This is the server-side half of the two-part authentication:
+ * <ol>
+ *   <li>The token proves cryptographic integrity (HMAC-SHA256 by kid).</li>
+ *   <li>The server-side record proves the session is still live — on
+ *       {@code DELETE /mcp} or server shutdown the entry is dropped and
+ *       any captured token referring to it stops being accepted, even
+ *       within its validity window.</li>
+ * </ol>
  */
 public final class SessionStore {
 
-  private final Map<String, SessionHandle> byId = new ConcurrentHashMap<>();
+  private final Map<String, IssuedSession> byId = new ConcurrentHashMap<>();
 
   /**
-   * Return the handle for {@code id}, creating an empty one if absent.
-   * Called at the start of every HTTP request that carries a session header.
+   * Register a new session.
+   *
+   * @param sessionId the public {@code Mcp-Session-Id}.
+   * @param nonce     the server-side secret bound to this session. Must
+   *                  match the {@code nonce} field in any token presented
+   *                  for this sid.
+   * @param expEpochSec UNIX seconds — matches the token's {@code exp}.
    */
-  public SessionHandle getOrCreate(String id) {
-    Objects.requireNonNull(id, "session id");
-    return byId.computeIfAbsent(id, k -> new SessionHandle());
+  public IssuedSession issue(String sessionId, String nonce, long expEpochSec,
+                             SessionHandle handle) {
+    Objects.requireNonNull(sessionId, "session id");
+    Objects.requireNonNull(nonce, "nonce");
+    Objects.requireNonNull(handle, "handle");
+    IssuedSession record = new IssuedSession(sessionId, nonce, expEpochSec, handle);
+    byId.put(sessionId, record);
+    return record;
   }
 
-  /**
-   * Return the handle for {@code id} if it exists, or {@code null}.
-   * Used to enforce "initialize must come first" — a client that sends
-   * a session id we don't know has violated the protocol.
-   */
-  public SessionHandle get(String id) {
+  public IssuedSession get(String id) {
     return id == null ? null : byId.get(id);
   }
 
   /**
-   * Register a freshly-initialised handle under {@code id}. Returns the
-   * previously-registered handle (if any) or {@code null}.
+   * Constant-time nonce comparison. Returns {@code true} iff the session
+   * exists and the presented nonce matches. Does not check expiry — the
+   * token layer already does that.
    */
-  public SessionHandle put(String id, SessionHandle handle) {
-    return byId.put(id, handle);
+  public boolean nonceMatches(String sessionId, String presentedNonce) {
+    IssuedSession s = get(sessionId);
+    if (s == null || presentedNonce == null) return false;
+    byte[] a = s.nonce.getBytes(StandardCharsets.UTF_8);
+    byte[] b = presentedNonce.getBytes(StandardCharsets.UTF_8);
+    return MessageDigest.isEqual(a, b);
   }
 
-  /**
-   * Remove a session. Called on {@code DELETE /mcp} or on transport close.
-   */
-  public SessionHandle remove(String id) {
+  public IssuedSession remove(String id) {
     return id == null ? null : byId.remove(id);
   }
 
   public int size() {
     return byId.size();
+  }
+
+  /** Drop all sessions whose {@code expEpochSec} is before {@code nowEpochSec}. */
+  public int purgeExpired(long nowEpochSec) {
+    int dropped = 0;
+    for (Map.Entry<String, IssuedSession> e : byId.entrySet()) {
+      if (e.getValue().expEpochSec < nowEpochSec) {
+        if (byId.remove(e.getKey(), e.getValue())) dropped++;
+      }
+    }
+    return dropped;
+  }
+
+  /** Immutable session record (the handle stays mutable). */
+  public static final class IssuedSession {
+    public final String sessionId;
+    public final String nonce;
+    public final long expEpochSec;
+    public final SessionHandle handle;
+
+    IssuedSession(String sessionId, String nonce, long expEpochSec, SessionHandle handle) {
+      this.sessionId = sessionId;
+      this.nonce = nonce;
+      this.expEpochSec = expEpochSec;
+      this.handle = handle;
+    }
   }
 }

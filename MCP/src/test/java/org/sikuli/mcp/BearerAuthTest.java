@@ -11,44 +11,64 @@ import static org.junit.jupiter.api.Assertions.*;
 class BearerAuthTest {
 
   @Test
-  void acceptsMatchingToken() {
-    BearerAuth a = new BearerAuth("s3cr3t");
-    assertTrue(a.accepts("Bearer s3cr3t"));
+  void staticTokenAcceptsMatchingHeader() {
+    BearerAuth.StaticToken t = new BearerAuth.StaticToken("s3cr3t");
+    assertTrue(t.accepts("Bearer s3cr3t"));
   }
 
   @Test
-  void rejectsMissingHeader() {
-    BearerAuth a = new BearerAuth("s3cr3t");
-    assertFalse(a.accepts(null));
-    assertFalse(a.accepts(""));
+  void staticTokenRejectsWrongScheme() {
+    BearerAuth.StaticToken t = new BearerAuth.StaticToken("s3cr3t");
+    assertFalse(t.accepts("Basic s3cr3t"));
+    assertFalse(t.accepts("s3cr3t"));
+    assertFalse(t.accepts(null));
+    assertFalse(t.accepts(""));
   }
 
   @Test
-  void rejectsWrongScheme() {
-    BearerAuth a = new BearerAuth("s3cr3t");
-    assertFalse(a.accepts("Basic s3cr3t"));
-    assertFalse(a.accepts("s3cr3t"));
+  void staticTokenRejectsEmptyCredential() {
+    BearerAuth.StaticToken t = new BearerAuth.StaticToken("s3cr3t");
+    assertFalse(t.accepts("Bearer "));
+    assertFalse(t.accepts("Bearer    "));
   }
 
   @Test
-  void rejectsWrongToken() {
-    BearerAuth a = new BearerAuth("s3cr3t");
-    assertFalse(a.accepts("Bearer nope"));
-    assertFalse(a.accepts("Bearer s3cr3T")); // case-sensitive
+  void staticTokenIsCaseSensitive() {
+    BearerAuth.StaticToken t = new BearerAuth.StaticToken("s3cr3t");
+    assertFalse(t.accepts("Bearer s3cr3T"));
   }
 
   @Test
-  void rejectsEmptyToken() {
-    BearerAuth a = new BearerAuth("s3cr3t");
-    assertFalse(a.accepts("Bearer "));
-    assertFalse(a.accepts("Bearer   "));
+  void staticTokenConstructorRejectsBlank() {
+    assertThrows(IllegalArgumentException.class, () -> new BearerAuth.StaticToken(""));
+    assertThrows(IllegalArgumentException.class, () -> new BearerAuth.StaticToken(null));
+    assertThrows(IllegalArgumentException.class, () -> new BearerAuth.StaticToken("   "));
   }
 
   @Test
-  void constructorRejectsEmptyToken() {
-    assertThrows(IllegalArgumentException.class, () -> new BearerAuth(""));
-    assertThrows(IllegalArgumentException.class, () -> new BearerAuth(null));
-    assertThrows(IllegalArgumentException.class, () -> new BearerAuth("   "));
+  void sessionMatchesIsConstantTime() {
+    // Functional check — not a timing test. Verifies that matches() returns
+    // true only for the exact bearer.
+    assertTrue(BearerAuth.matches("Bearer abc", "abc"));
+    assertFalse(BearerAuth.matches("Bearer abc", "abd"));
+    assertFalse(BearerAuth.matches("Bearer abc", null));
+    assertFalse(BearerAuth.matches(null, "abc"));
+    assertFalse(BearerAuth.matches("Basic abc", "abc"));
+    // Length mismatch must not short-circuit in an observable way.
+    assertFalse(BearerAuth.matches("Bearer a", "abc"));
+    assertFalse(BearerAuth.matches("Bearer abcd", "abc"));
+  }
+
+  @Test
+  void extractBearerHandlesCornerCases() {
+    assertEquals("abc", BearerAuth.extractBearer("Bearer abc"));
+    assertEquals("abc", BearerAuth.extractBearer("Bearer abc  "));
+    assertNull(BearerAuth.extractBearer(null));
+    assertNull(BearerAuth.extractBearer(""));
+    assertNull(BearerAuth.extractBearer("Bearer"));
+    assertNull(BearerAuth.extractBearer("Bearer "));
+    assertNull(BearerAuth.extractBearer("bearer abc"));   // case-sensitive scheme
+    assertNull(BearerAuth.extractBearer("Basic abc"));
   }
 
   @Test

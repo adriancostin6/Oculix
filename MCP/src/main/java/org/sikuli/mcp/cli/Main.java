@@ -14,6 +14,8 @@ import org.sikuli.mcp.server.StartupCheck;
 import org.sikuli.mcp.tools.ToolRegistry;
 import org.sikuli.mcp.transport.BearerAuth;
 import org.sikuli.mcp.transport.HttpTransport;
+import org.sikuli.mcp.transport.KeyRing;
+import org.sikuli.mcp.transport.TokenIssuer;
 
 import java.nio.file.*;
 import java.security.PublicKey;
@@ -48,11 +50,12 @@ public final class Main {
                                      : Arrays.copyOfRange(args, 1, args.length);
 
     switch (cmd) {
-      case "run":         cmdRun(); break;
-      case "serve":       cmdServe(rest); break;
-      case "rotate-key":  cmdRotateKey(); break;
-      case "recover":     cmdRecover(); break;
-      case "verify":      cmdVerify(rest); break;
+      case "run":                  cmdRun(); break;
+      case "serve":                cmdServe(rest); break;
+      case "rotate-key":           cmdRotateKey(); break;
+      case "rotate-session-key":   cmdRotateSessionKey(); break;
+      case "recover":              cmdRecover(); break;
+      case "verify":               cmdVerify(rest); break;
       case "--help":
       case "-h":
       case "help":        printUsage(); break;
@@ -133,13 +136,22 @@ public final class Main {
       return;
     }
 
-    String token = System.getenv("OCULIX_MCP_TOKEN");
-    boolean generated = false;
-    if (token == null || token.isBlank()) {
-      token = BearerAuth.generateToken();
-      generated = true;
+    // Client-token layer (OPTIONAL). Gates `initialize` only. When unset,
+    // any caller reaching the bound interface can initialize — fine on
+    // loopback, insufficient on a remote-reachable host. Session bearers
+    // (layer 2) are always enforced on all subsequent calls; they are
+    // minted per-initialize and returned to the client in the response.
+    String envClientToken = System.getenv("OCULIX_MCP_TOKEN");
+    BearerAuth.StaticToken clientToken = null;
+    String clientTokenNote;
+    if (envClientToken != null && !envClientToken.isBlank()) {
+      clientToken = new BearerAuth.StaticToken(envClientToken);
+      clientTokenNote = "enforced via OCULIX_MCP_TOKEN env var";
+    } else {
+      clientTokenNote = "DISABLED — any caller on "
+          + ("127.0.0.1".equals(host) ? "loopback" : host + ":" + port)
+          + " can call initialize. Set OCULIX_MCP_TOKEN to require a pre-shared client credential.";
     }
-    BearerAuth auth = new BearerAuth(token);
 
     ToolRegistry.Mode mode = ToolRegistry.Mode.fromEnv();
     ToolRegistry registry = ToolRegistry.defaultRegistry(mode);
@@ -149,20 +161,23 @@ public final class Main {
       McpDispatcher dispatcher = new McpDispatcher(
           registry, new AutoApproveGate(), journal);
       SessionStore sessions = new SessionStore();
-      HttpTransport http = new HttpTransport(dispatcher, sessions, auth, host, port);
+      // Session-token keyring. HMAC-SHA256 keyed by kid, rotation-capable.
+      KeyRing keyring = KeyRing.loadOrInit(
+          oculixDir.resolve("session-hmac-keyring.json"));
+      TokenIssuer issuer = new TokenIssuer(keyring);
+
+      HttpTransport http = new HttpTransport(dispatcher, sessions, issuer,
+          clientToken, host, port);
       http.start();
 
       int bound = http.boundPort();
       System.err.println("[oculix-mcp] listening on http://" + host + ":" + bound + "/mcp");
       System.err.println("[oculix-mcp] mode=" + mode.name().toLowerCase()
           + " tools=" + registry.size());
-      if (generated) {
-        System.err.println("[oculix-mcp] OCULIX_MCP_TOKEN not set — generated one-shot token:");
-        System.err.println("[oculix-mcp]   " + token);
-        System.err.println("[oculix-mcp] Persist it as an env var to avoid regenerating on restart.");
-      } else {
-        System.err.println("[oculix-mcp] bearer token: from OCULIX_MCP_TOKEN env var");
-      }
+      System.err.println("[oculix-mcp] client token: " + clientTokenNote);
+      System.err.println("[oculix-mcp] session tokens: HMAC-SHA256, kid=" + keyring.currentKid()
+          + " (" + keyring.size() + " kid(s) in ring)");
+      System.err.println("[oculix-mcp] token TTL: " + HttpTransport.DEFAULT_TOKEN_TTL_SECONDS + "s");
 
       // Block the main thread; shutdown on Ctrl-C / SIGTERM.
       Thread shutdown = new Thread(() -> {
@@ -173,6 +188,39 @@ public final class Main {
       // Park forever.
       synchronized (http) { http.wait(); }
     }
+  }
+
+  // ── rotate-session-key ──
+
+  /**
+   * Rotate the HMAC keyring used to sign session tokens.
+   *
+   * <p>Generates a fresh kid, makes it current, and keeps the previous kid
+   * so that already-issued tokens stay verifiable until they expire or
+   * {@code retire} is invoked. Tokens minted from this point on are signed
+   * with the new kid.
+   *
+   * <p>Operational note: key rotation here is independent of the audit-chain
+   * Ed25519 rotation handled by {@code rotate-key}. The two keys serve
+   * different purposes — signing session auth vs signing audit entries —
+   * and follow different cadences.
+   */
+  private static void cmdRotateSessionKey() throws Exception {
+    Path oculixDir = StartupCheck.defaultOculixDir();
+    Files.createDirectories(oculixDir);
+    Path ringPath = oculixDir.resolve("session-hmac-keyring.json");
+    KeyRing ring = KeyRing.loadOrInit(ringPath);
+    String old = ring.currentKid();
+    String fresh = ring.generate();
+    ring.save(ringPath);
+    System.out.println("Session-token keyring rotated.");
+    System.out.println("  previous kid:  " + old);
+    System.out.println("  new kid:       " + fresh);
+    System.out.println("  ring size:     " + ring.size());
+    System.out.println();
+    System.out.println("Tokens minted with previous kids remain verifiable until they expire.");
+    System.out.println("To force-expire all outstanding tokens, retire the old kids manually");
+    System.out.println("or delete " + ringPath + " to wipe the ring entirely.");
   }
 
   // ── rotate-key ──
@@ -297,10 +345,15 @@ public final class Main {
     System.out.println("  oculix-mcp serve        Start the MCP server over HTTP (Streamable HTTP)");
     System.out.println("                          Flags: --host HOST (default 127.0.0.1)");
     System.out.println("                                 --port PORT (default 7337, 0 for auto)");
-    System.out.println("                          Env:   OCULIX_MCP_TOKEN (bearer auth, generated if absent)");
+    System.out.println("                          Env:   OCULIX_MCP_TOKEN  pre-shared client token");
+    System.out.println("                                                   (optional, gates initialize)");
     System.out.println("                                 OCULIX_MCP_MODE=open|confidential");
-    System.out.println("                                 OCULIX_MCP_VAULT=<path> (confidential mode landing dir)");
-    System.out.println("  oculix-mcp rotate-key   Rotate the Ed25519 audit signing key");
+    System.out.println("                                 OCULIX_MCP_VAULT=<path> confidential landing dir");
+    System.out.println("                                 OCULIX_MCP_TRUST_TLS_TERMINATION=1");
+    System.out.println("                                                   acknowledge upstream TLS");
+    System.out.println("                                                   for non-loopback binds");
+    System.out.println("  oculix-mcp rotate-key            Rotate the Ed25519 audit signing key");
+    System.out.println("  oculix-mcp rotate-session-key    Rotate the HMAC keyring for session tokens");
     System.out.println("  oculix-mcp recover      Record an unsigned gap and start a fresh chain");
     System.out.println("  oculix-mcp verify [FILES...]");
     System.out.println("                          Verify journal files (all by default)");

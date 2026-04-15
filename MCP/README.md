@@ -117,18 +117,20 @@ Each tool's JSON schema is exposed via `tools/list` on the MCP connection.
 ## CLI subcommands
 
 ```
-oculix-mcp run                Start the MCP server over stdio (default)
-oculix-mcp serve [flags]      Start the MCP server over HTTP (Streamable HTTP)
-                              --host HOST   (default 127.0.0.1)
-                              --port PORT   (default 7337, 0 for auto)
-                              env OCULIX_MCP_TOKEN    bearer auth (generated if absent)
-                              env OCULIX_MCP_MODE     open | confidential
-                              env OCULIX_MCP_VAULT    confidential-mode landing dir
-oculix-mcp rotate-key         Rotate the Ed25519 audit signing key
-oculix-mcp recover            Record an unsigned-gap and start a fresh chain
-oculix-mcp verify             Verify all audit journals
-oculix-mcp verify FILE        Verify a specific file
-oculix-mcp --help             Show usage
+oculix-mcp run                    Start over stdio (default — for Claude Desktop etc.)
+oculix-mcp serve [flags]          Start over HTTP (Streamable HTTP)
+                                  --host HOST   (default 127.0.0.1)
+                                  --port PORT   (default 7337, 0 for auto)
+                                  env OCULIX_MCP_TOKEN   optional client token
+                                  env OCULIX_MCP_MODE    open | confidential
+                                  env OCULIX_MCP_VAULT   confidential landing dir
+                                  env OCULIX_MCP_TRUST_TLS_TERMINATION=1
+                                                         acknowledge upstream TLS
+oculix-mcp rotate-key             Rotate the Ed25519 audit signing key
+oculix-mcp rotate-session-key     Rotate the HMAC keyring for session tokens
+oculix-mcp recover                Record an unsigned-gap and start a fresh chain
+oculix-mcp verify [FILES...]      Verify audit journals (all by default)
+oculix-mcp --help                 Show usage
 ```
 
 ### Key rotation
@@ -223,45 +225,117 @@ The `llm.backend` and `llm.user_id` fields in the audit trail are populated only
 
 Stdio is not the only transport. A remote MCP client (qaopslab, an on-prem
 Mistral orchestrator, the official MCP Inspector) can reach the server over
-HTTP on the loopback interface (or through a reverse proxy on a VLAN).
+HTTP on the loopback interface (or through a reverse proxy with TLS).
 
-Start the HTTP server:
+### Dev quick start — no auth to fiddle with
+
+On loopback, with no pre-shared credential, you can get a full session in
+three `curl` commands:
 
 ```bash
-OCULIX_MCP_TOKEN=$(openssl rand -base64 32) \
-  java -jar oculix-mcp-server.jar serve --host 127.0.0.1 --port 7337
+java -jar MCP/target/oculix-mcp-server.jar serve
+#   → listening on http://127.0.0.1:7337/mcp
+#   → client token: DISABLED (any caller on loopback can initialize)
+
+# 1. initialize — returns Mcp-Session-Id (header) + bearer (body)
+RESP=$(curl -s -D /tmp/h.txt -X POST http://127.0.0.1:7337/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}')
+SID=$(grep -i mcp-session-id /tmp/h.txt | awk '{print $2}' | tr -d '\r')
+BEARER=$(echo "$RESP" | jq -r '.result._meta.bearer')
+
+# 2. tools/list
+curl -s -X POST http://127.0.0.1:7337/mcp \
+  -H "Mcp-Session-Id: $SID" \
+  -H "Authorization: Bearer $BEARER" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | jq
+
+# 3. DELETE — revoke the session
+curl -s -X DELETE http://127.0.0.1:7337/mcp \
+  -H "Mcp-Session-Id: $SID" \
+  -H "Authorization: Bearer $BEARER" -o /dev/null -w "%{http_code}\n"
 ```
 
-Endpoint: `POST / GET / DELETE http://<host>:<port>/mcp`, per the MCP
-Streamable HTTP spec (2024-11-05).
+The MCP Inspector works the same way:
 
-Every request must carry:
+```bash
+npx @modelcontextprotocol/inspector \
+  --transport streamable-http \
+  --url http://127.0.0.1:7337/mcp
+```
 
-- `Authorization: Bearer $OCULIX_MCP_TOKEN` — missing or wrong yields `401`.
-- `Mcp-Session-Id: <id>` — echoed by the client after `initialize`.
-  Unknown ids yield `404`; missing on a non-initialize request yields `400`.
+No `--header` flag needed in dev mode — Inspector will issue a fresh
+bearer on `initialize` and reuse it for the whole session.
 
-If `OCULIX_MCP_TOKEN` is not set, the server generates a random one-shot
-token and prints it on stderr. Persist the env var for repeatable restarts
-— never treat the printed token as durable.
+### Auth model — two layers
+
+**Layer 1: client credential (optional, PAT-style).** Gates `initialize`.
+Configured via `OCULIX_MCP_TOKEN`. Unset → anyone on the bound interface can
+initialize, which is acceptable on loopback. Set it when exposing the server
+beyond localhost.
+
+**Layer 2: session token (mandatory, ephemeral).** Minted by the server on
+every successful `initialize`, returned in `result._meta.bearer`. Format:
+
+```
+ocx.<kid>.<b64url(payload)>.<b64url(hmac)>
+```
+
+Where the payload is canonical JSON:
+
+```json
+{"aud":"oculix-mcp","sid":"<uuid>","nonce":"<b64url 256 bits>","iat":<unix>,"exp":<unix>}
+```
+
+The client sends it back as `Authorization: Bearer <value>` on every
+subsequent request. Default TTL is 30 minutes; refresh by re-initializing.
+
+Verification chain on every request:
+
+1. Structural parse + `ocx` prefix.
+2. `kid` looked up in the server's keyring.
+3. HMAC-SHA256 recomputed and compared in constant time
+   (`MessageDigest.isEqual`).
+4. Payload `aud` is `"oculix-mcp"`, `exp` not in the past (30 s skew).
+5. `Mcp-Session-Id` header matches the token's embedded `sid`.
+6. Server-side `SessionStore` still has the session and its nonce matches
+   the token's nonce (constant time).
+
+A leaked token **cannot** be replayed against a different session id; a
+token whose session was `DELETE`d is rejected with `404` even if still
+crypto-valid; key rotation leaves outstanding tokens valid until they
+expire naturally.
+
+### Session-token key rotation
+
+```bash
+oculix-mcp rotate-session-key
+#   Session-token keyring rotated.
+#     previous kid:  k9QwM7eL
+#     new kid:       kX3pT2aB
+#     ring size:     2
+```
+
+The HMAC keyring lives in `~/.oculix-mcp/session-hmac-keyring.json`
+(permissions `0600`). Generating a new kid keeps old kids in the ring so
+already-issued tokens remain verifiable until they expire. Delete the
+file to force all outstanding sessions into hard failure.
+
+### TLS
+
+Plain HTTP on anything other than a loopback address is refused at startup.
+If TLS is terminated upstream (nginx, Caddy, service mesh, WAF), set
+`OCULIX_MCP_TRUST_TLS_TERMINATION=1` to acknowledge that responsibility
+before binding `--host 0.0.0.0` or a non-local interface. In-process TLS
+via `addHttpsListener` is planned but not shipped — use a reverse proxy
+for now; certificate rotation and WAF policy belong there anyway.
 
 ### Concurrency
 
 Screen actions are serialized through a fair lock: no matter how many
 clients share one process, two `oculix_click_image` cannot interleave.
 This is independent of the transport.
-
-### MCP Inspector
-
-```bash
-npx @modelcontextprotocol/inspector \
-  --transport streamable-http \
-  --url http://127.0.0.1:7337/mcp \
-  --header "Authorization: Bearer $OCULIX_MCP_TOKEN"
-```
-
-Then exercise `tools/list`, `tools/call`, verify session headers round-trip,
-and confirm the audit journal populates on every call.
 
 ---
 
