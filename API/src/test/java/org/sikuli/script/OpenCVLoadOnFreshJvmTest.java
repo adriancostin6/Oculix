@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.opencv.core.Mat;
 import org.sikuli.support.Commons;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Regression test for the UnsatisfiedLinkError reported on Apple Silicon (Mac M1)
@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * guaranteeing the native lib is ready for any caller.
  *
  * <p>This test exercises the two entry points that used to crash on a fresh JVM:
- * {@code Commons.getNewMat()} and {@code Commons.makeMat(BufferedImage)} via
- * {@code new Pattern(...)}. It must be kept in its own test class so Surefire
- * runs it in a clean classloader state (no previous Finder reference).
+ * {@code Commons.getNewMat()} and Pattern instance-field init. It must be kept
+ * in its own test class so Surefire runs it in a clean classloader state
+ * (no previous Finder reference).
  */
 class OpenCVLoadOnFreshJvmTest {
 
@@ -34,9 +34,8 @@ class OpenCVLoadOnFreshJvmTest {
     // This line is what used to throw UnsatisfiedLinkError on Mac M1 before the fix.
     // Commons's static initializer is triggered here (first reference to the class),
     // and it must have loaded OpenCV before new Mat() is ever called.
-    Mat m = assertDoesNotThrow(Commons::getNewMat,
-        "new Mat() should not throw UnsatisfiedLinkError: OpenCV native lib must be loaded "
-            + "by Commons static initializer, not only by Finder2's static block.");
+    // If the fix regresses, JUnit reports the UnsatisfiedLinkError as a test error.
+    Mat m = Commons.getNewMat();
     assertNotNull(m);
     assertNotNull(m.size());
   }
@@ -47,14 +46,13 @@ class OpenCVLoadOnFreshJvmTest {
     // field that reproduced Raimund's crash. We don't care whether the image
     // resolves (it won't — file does not exist); we only care that the OpenCV
     // native path is reached without UnsatisfiedLinkError.
-    assertDoesNotThrow(() -> {
-      try {
-        new Pattern("__nonexistent_regression_test__.png");
-      } catch (UnsatisfiedLinkError e) {
-        throw e; // fail the test loudly
-      } catch (Throwable ignored) {
-        // Any other failure (SikuliXception, missing file, etc.) is acceptable here.
-      }
-    }, "new Pattern(...) must not raise UnsatisfiedLinkError");
+    try {
+      new Pattern("__nonexistent_regression_test__.png");
+    } catch (UnsatisfiedLinkError e) {
+      fail("new Pattern(...) raised UnsatisfiedLinkError: " + e.getMessage()
+          + " -- Commons.loadOpenCV() was not called before Pattern.patternMask field init");
+    } catch (Throwable ignored) {
+      // Any other failure (SikuliXception, missing file, etc.) is acceptable here.
+    }
   }
 }
