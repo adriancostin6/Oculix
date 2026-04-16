@@ -29,8 +29,14 @@ public class RecorderAssistant extends JDialog {
   private final JythonCodeGenerator codeGenerator;
   private File screenshotDir;
 
+  // App scope: Screen (full) or App.window() (scoped)
+  private Region actionScope = new Screen();
+  private App currentApp = null;
+
   // UI components
   private JLabel statusLabel;
+  private JButton btnLaunchApp, btnCloseApp;
+  private JCheckBox chkScopeToApp;
   private JButton btnClick, btnDblClick, btnRClick;
   private JButton btnTextClick, btnTextWait, btnTextExists;
   private JButton btnType, btnKeyCombo;
@@ -42,7 +48,7 @@ public class RecorderAssistant extends JDialog {
 
   public RecorderAssistant(Frame parent) {
     super(parent, "OculiX Modern Recorder (beta)", false);
-    setSize(400, 580);
+    setSize(400, 680);
     setLocationRelativeTo(parent);
     setAlwaysOnTop(true);
     setType(Window.Type.UTILITY);
@@ -94,6 +100,26 @@ public class RecorderAssistant extends JDialog {
     content.add(statusLabel);
 
     content.add(new JSeparator(), "growx");
+
+    // ── Launch app ──
+    content.add(createSectionLabel("APPLICATION"));
+
+    JPanel appRow = new JPanel(new MigLayout("insets 0, gap 4", "[grow][grow]"));
+    appRow.setOpaque(false);
+    btnLaunchApp = createActionButton("Launch App");
+    btnCloseApp = createActionButton("Close App");
+    btnCloseApp.setEnabled(false);
+    appRow.add(btnLaunchApp, "grow");
+    appRow.add(btnCloseApp, "grow");
+    content.add(appRow);
+
+    chkScopeToApp = new JCheckBox("Scope actions to this app", true);
+    chkScopeToApp.setFont(UIManager.getFont("defaultFont").deriveFont(11f));
+    chkScopeToApp.setOpaque(false);
+    chkScopeToApp.setEnabled(false);
+    content.add(chkScopeToApp);
+
+    content.add(new JSeparator(), "growx, gaptop 4");
 
     // ── Image actions ──
     content.add(createSectionLabel("IMAGE ACTIONS"));
@@ -198,6 +224,11 @@ public class RecorderAssistant extends JDialog {
     // State listener for UI updates
     workflow.addStateListener((oldState, newState) -> updateStatus(newState));
 
+    // Launch / Close app
+    btnLaunchApp.addActionListener(e -> handleLaunchApp());
+    btnCloseApp.addActionListener(e -> handleCloseApp());
+    chkScopeToApp.addActionListener(e -> updateActionScope());
+
     // Image actions
     btnClick.addActionListener(e -> handleImageCapture("click"));
     btnDblClick.addActionListener(e -> handleImageCapture("doubleClick"));
@@ -256,7 +287,7 @@ public class RecorderAssistant extends JDialog {
             javax.imageio.ImageIO.read(new File(imagePath));
         if (candidate != null) {
           result = PatternValidator.validate(
-              new Screen().capture().getImage(), candidate);
+              new Screen().capture(actionScope).getImage(), candidate);
         }
       } catch (Exception | UnsatisfiedLinkError ignored) {
         // OpenCV missing or IO error — skip validation
@@ -286,20 +317,31 @@ public class RecorderAssistant extends JDialog {
     }
   }
 
+  private boolean isAppScoped() {
+    return currentApp != null && chkScopeToApp.isSelected();
+  }
+
   private String generateImageCode(String actionType, Pattern pattern) {
     String[] noModifiers = new String[0];
+    String code;
     switch (actionType) {
       case "click":
-        return codeGenerator.click(pattern, noModifiers);
+        code = codeGenerator.click(pattern, noModifiers);
+        break;
       case "doubleClick":
-        return codeGenerator.doubleClick(pattern, noModifiers);
+        code = codeGenerator.doubleClick(pattern, noModifiers);
+        break;
       case "rightClick":
-        return codeGenerator.rightClick(pattern, noModifiers);
+        code = codeGenerator.rightClick(pattern, noModifiers);
+        break;
       case "wait":
-        return codeGenerator.wait(pattern, 10, null);
+        code = codeGenerator.wait(pattern, 10, null);
+        break;
       default:
-        return "# " + actionType + "(\"" + pattern.getFilename() + "\")";
+        code = "# " + actionType + "(\"" + pattern.getFilename() + "\")";
+        break;
     }
+    return isAppScoped() ? "region." + code : code;
   }
 
   private void handleDragDrop() {
@@ -719,6 +761,64 @@ public class RecorderAssistant extends JDialog {
     return capturedImages.stream()
         .filter(p -> new File(p).getName().equals(chosen))
         .findFirst().orElse(null);
+  }
+
+  // ── Launch / Close App ──
+
+  private void handleLaunchApp() {
+    String appPath = JOptionPane.showInputDialog(this,
+        "Application path or command:", "Launch App", JOptionPane.PLAIN_MESSAGE);
+    if (appPath == null || appPath.trim().isEmpty()) return;
+    appPath = appPath.trim();
+
+    try {
+      currentApp = App.open(appPath);
+      if (currentApp == null) {
+        RecorderNotifications.error("Failed to launch: " + appPath);
+        return;
+      }
+
+      btnLaunchApp.setEnabled(false);
+      btnCloseApp.setEnabled(true);
+      chkScopeToApp.setEnabled(true);
+
+      updateActionScope();
+
+      String code = "app = App.open(\"" + appPath + "\")";
+      if (chkScopeToApp.isSelected()) {
+        code += "\nregion = app.window()";
+      }
+      codePreview.addLine(code);
+      RecorderNotifications.success("Launched: " + appPath);
+    } catch (Exception ex) {
+      RecorderNotifications.error("Launch failed: " + ex.getMessage());
+    }
+  }
+
+  private void handleCloseApp() {
+    if (currentApp != null) {
+      try {
+        currentApp.close();
+        codePreview.addLine("app.close()");
+        RecorderNotifications.success("App closed");
+      } catch (Exception ex) {
+        RecorderNotifications.error("Close failed: " + ex.getMessage());
+      }
+    }
+    currentApp = null;
+    actionScope = new Screen();
+    btnLaunchApp.setEnabled(true);
+    btnCloseApp.setEnabled(false);
+    chkScopeToApp.setEnabled(false);
+  }
+
+  private void updateActionScope() {
+    if (currentApp != null && chkScopeToApp.isSelected()) {
+      Region appWindow = currentApp.window();
+      actionScope = appWindow != null ? appWindow : new Screen();
+    } else {
+      actionScope = new Screen();
+    }
   }
 
   private void cleanupTempDir() {
