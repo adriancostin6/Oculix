@@ -696,7 +696,7 @@ public class RecorderAssistant extends JDialog {
       options.add("Use existing image");
     }
 
-    int choice = JOptionPane.showOptionDialog(this,
+    int choice = JOptionPane.showOptionDialog(null,
         "Choose image source for: " + purpose,
         purpose,
         JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
