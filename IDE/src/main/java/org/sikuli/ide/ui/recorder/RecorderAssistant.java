@@ -782,13 +782,17 @@ public class RecorderAssistant extends JDialog {
       btnCloseApp.setEnabled(true);
       chkScopeToApp.setEnabled(true);
 
-      updateActionScope();
-
       codePreview.addLine("app = App.open(\"" + appPath + "\")");
       if (chkScopeToApp.isSelected()) {
         codePreview.addLine("region = app.window()");
       }
       RecorderNotifications.success("Launched: " + appPath);
+
+      try {
+        updateActionScope();
+      } catch (Exception ignored) {
+        actionScope = new Screen();
+      }
     } catch (Exception ex) {
       RecorderNotifications.error("Launch failed: " + ex.getMessage());
     }
