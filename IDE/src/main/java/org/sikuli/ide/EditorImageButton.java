@@ -116,6 +116,20 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
     setFocusPainted(false);
   }
 
+  // Build a fresh clone of this button carrying the same visible state but
+  // with a fresh ButtonUI installed under the active LaF. Called by
+  // EditorPane.afterThemeChange() to replace every embedded image button
+  // after a theme toggle so the Flat ButtonUI defaults don't leave the
+  // thumbnails invisible or un-clickable.
+  public EditorImageButton cloneForRefresh(EditorPane pane) {
+    if (options == null) return null;
+    Object patt = options.get(IButton.PATT);
+    if (patt instanceof Pattern) return new EditorImageButton((Pattern) patt);
+    Object file = options.get(IButton.FILE);
+    if (file instanceof File) return new EditorImageButton((File) file);
+    return null;
+  }
+
   @Override
   public void actionPerformed(ActionEvent e) {
     final EditorImageButton source = (EditorImageButton) e.getSource();

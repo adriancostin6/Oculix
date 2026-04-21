@@ -202,6 +202,24 @@ class EditorPatternButton extends EditorImageButton implements ActionListener, S
     pwin = null;
   }
 
+  // Rebuild a fresh instance carrying the same state under the active LaF.
+  // Uses the filename + similarity/exact/offset/resize/numMatches params so
+  // the fresh button's ButtonUI is clean and the ComponentView is forced
+  // to re-layout after a theme toggle (issue #165).
+  @Override
+  public EditorImageButton cloneForRefresh(EditorPane pane) {
+    if (_imgFilename == null) return null;
+    EditorPatternButton fresh = new EditorPatternButton(pane, _imgFilename);
+    fresh.setExact(_exact);
+    fresh.setSimilarity(_similarity);
+    fresh.setResizeFactor(_resizeFactor);
+    if (_offset != null) fresh.setTargetOffset(_offset);
+    fresh._numMatches = _numMatches;
+    if (_mask != null) fresh.setMask(_mask);
+    fresh.setButtonText();
+    return fresh;
+  }
+
 /*
   public String getFilename() {
     File img = new File(_imgFilename);

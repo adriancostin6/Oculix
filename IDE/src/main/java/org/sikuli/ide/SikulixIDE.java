@@ -627,10 +627,23 @@ public class SikulixIDE extends JFrame {
     }
   }
 
-  // Invoked after the sidebar theme toggle has already called FlatLaf.updateUI().
-  // Forces every open editor tab to re-lay out so embedded image buttons are
-  // re-painted with the new LaF (issue #165: image icons vanishing on toggle).
+  // Invoked by OculixSidebar.initFooter around the Dark/Light toggle. The
+  // sidebar triggers FlatLaf.updateUI() itself; we dispatch a symmetric
+  // before/after pair so every ThemeAware component can tear down and
+  // rebuild its LaF-sensitive state around the swap. This is the central
+  // entry point for theme lifecycle (issue #165).
   private void refreshAfterThemeChange() {
+    java.util.List<ThemeAware> themeAware = collectThemeAware();
+    for (ThemeAware t : themeAware) {
+      try { t.beforeThemeChange(); }
+      catch (Exception ex) { error("beforeThemeChange on %s: %s", t, ex.getMessage()); }
+    }
+    // FlatLaf.updateUI() has already been run by the sidebar toggle before
+    // this callback; the actual swap happens between the two phases.
+    for (ThemeAware t : themeAware) {
+      try { t.afterThemeChange(); }
+      catch (Exception ex) { error("afterThemeChange on %s: %s", t, ex.getMessage()); }
+    }
     if (tabs != null) {
       for (int i = 0; i < tabs.getTabCount(); i++) {
         Component tab = tabs.getComponentAt(i);
@@ -644,6 +657,21 @@ public class SikulixIDE extends JFrame {
       ideWindow.revalidate();
       ideWindow.repaint();
     }
+  }
+
+  private java.util.List<ThemeAware> collectThemeAware() {
+    java.util.List<ThemeAware> list = new java.util.ArrayList<>();
+    if (contexts != null) {
+      for (PaneContext ctx : contexts) {
+        if (ctx != null && ctx.pane instanceof ThemeAware) {
+          list.add((ThemeAware) ctx.pane);
+        }
+      }
+    }
+    if (sidebar instanceof ThemeAware) {
+      list.add((ThemeAware) sidebar);
+    }
+    return list;
   }
 
   private SidebarSubmenu buildSubmenuFrom(JMenu sourceMenu) {

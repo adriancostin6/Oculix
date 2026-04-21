@@ -41,7 +41,7 @@ import java.util.prefs.PreferenceChangeListener;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class EditorPane extends JTextPane {
+public class EditorPane extends JTextPane implements ThemeAware {
 
   //<editor-fold defaultstate="collapsed" desc="02 Initialization">
   static final String me = "EditorPane: ";
@@ -171,6 +171,69 @@ public class EditorPane extends JTextPane {
     if (!Settings.isMac()) {
       setSelectionColor(new Color(170, 200, 255));
     }
+  }
+
+  // Theme lifecycle: the LaF swap invalidates the ButtonUI of any embedded
+  // EditorImageButton, which can leave the thumbnails invisible and
+  // un-clickable. Collect their state before the swap, then rebuild fresh
+  // instances under the new LaF afterwards.
+  private java.util.List<int[]> savedThumbOffsets;
+  private java.util.List<EditorImageButton> savedThumbButtons;
+
+  @Override
+  public void beforeThemeChange() {
+    savedThumbOffsets = new java.util.ArrayList<>();
+    savedThumbButtons = new java.util.ArrayList<>();
+    if (!(getDocument() instanceof DefaultStyledDocument)) return;
+    DefaultStyledDocument doc = (DefaultStyledDocument) getDocument();
+    int len = doc.getLength();
+    int i = 0;
+    while (i < len) {
+      Element el = doc.getCharacterElement(i);
+      int next = el.getEndOffset();
+      if (next <= i) break;
+      if (StyleConstants.ComponentElementName.equals(el.getName())) {
+        java.awt.Component c = StyleConstants.getComponent(el.getAttributes());
+        if (c instanceof EditorImageButton) {
+          savedThumbOffsets.add(new int[]{el.getStartOffset()});
+          savedThumbButtons.add((EditorImageButton) c);
+        }
+      }
+      i = next;
+    }
+  }
+
+  @Override
+  public void afterThemeChange() {
+    setBackground(Color.WHITE);
+    setForeground(Color.BLACK);
+    setCaretColor(Color.BLACK);
+    if (!Settings.isMac()) {
+      setSelectionColor(new Color(170, 200, 255));
+    }
+    if (savedThumbButtons == null || savedThumbButtons.isEmpty()) return;
+    if (!(getDocument() instanceof DefaultStyledDocument)) return;
+    DefaultStyledDocument doc = (DefaultStyledDocument) getDocument();
+    // Process in reverse offset order so earlier offsets remain valid as we
+    // remove+reinsert later ones.
+    for (int idx = savedThumbOffsets.size() - 1; idx >= 0; idx--) {
+      int pos = savedThumbOffsets.get(idx)[0];
+      EditorImageButton old = savedThumbButtons.get(idx);
+      EditorImageButton fresh = old.cloneForRefresh(this);
+      if (fresh == null) continue;
+      try {
+        doc.remove(pos, 1);
+        SimpleAttributeSet attr = new SimpleAttributeSet();
+        StyleConstants.setComponent(attr, fresh);
+        doc.insertString(pos, "￼", attr);
+      } catch (BadLocationException e) {
+        error("afterThemeChange: cannot swap component at %d: %s", pos, e.getMessage());
+      }
+    }
+    savedThumbOffsets = null;
+    savedThumbButtons = null;
+    revalidate();
+    repaint();
   }
 
   public void loadContent(InputStreamReader isr) throws IOException {
