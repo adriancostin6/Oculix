@@ -48,6 +48,7 @@ public class RecorderAssistant extends JDialog {
     setAlwaysOnTop(true);
     setType(Window.Type.UTILITY);
     setResizable(false);
+    setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
     this.workflow = new RecorderWorkflow();
     this.codePreview = new RecorderCodePreview();
@@ -345,6 +346,12 @@ public class RecorderAssistant extends JDialog {
       cleanupTempDir();
     });
 
+    // Drop alwaysOnTop before dispose so Windows releases the taskbar
+    // tracking for this window. Leaving it on at dispose time has been
+    // observed to leave a stranded entry in the Windows taskbar after
+    // Insert&Close.
+    setAlwaysOnTop(false);
+    setVisible(false);
     dispose();
   }
 
