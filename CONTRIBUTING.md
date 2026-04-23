@@ -19,8 +19,10 @@
 > [Report a bug](#reporting-a-bug--what-earns-a-same-day-fix) ·
 > [Request a feature](#requesting-a-feature) ·
 > [Submit a PR](#submitting-a-pull-request) ·
+> [Fork workflow](#fork-workflow) ·
 > [Development setup](#development-setup) ·
-> [Good first contributions](#good-first-contributions)
+> [Good first contributions](#good-first-contributions) ·
+> [Governance](#governance--maintainers)
 
 OculiX is the active continuation of SikuliX1, which was archived in March 2026 after two decades of community work. A lot of that community is still out there running scripts in production — and a lot of them are discovering OculiX one stack trace at a time.
 
@@ -98,15 +100,35 @@ What we'll fast-track:
 
 **Read the surrounding code.** OculiX inherits 15 years of SikuliX conventions. Some of them are weird, some of them are load-bearing. If your PR ignores a pattern that's used everywhere else, we'll ask why — and "AI didn't know" isn't an answer.
 
+### Fork workflow
+
+External contributions go through the standard GitHub fork + PR flow:
+
+1. Fork [`oculix-org/Oculix`](https://github.com/oculix-org/Oculix) to your own account
+2. Clone your fork, add the upstream remote
+3. Branch from `upstream/master`, push to your fork
+4. Open the PR against `oculix-org/Oculix:master`
+
+One-time setup:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/Oculix.git
+cd Oculix
+git remote add upstream https://github.com/oculix-org/Oculix.git
+```
+
+**Write access** to the main repo (no more forking, direct branches) is granted case-by-case to trusted contributors after a few solid PRs. If you'd like it, mention it in your second or third PR — we'll discuss once we've seen how you work. See [Governance & maintainers](#governance--maintainers) for the full picture.
+
 ### Branch from `master`
 
 ```bash
-git checkout master
-git pull
-git checkout -b fix/my-short-description
+git fetch upstream
+git checkout -b fix/my-short-description upstream/master
 ```
 
 Name your branch with a prefix: `fix/`, `feat/`, `docs/`, `refactor/`, `ci/`.
+
+When you're done, push to your fork (`git push -u origin fix/my-short-description`) and open the PR.
 
 ### Build locally — don't rely on CI to find out it's broken
 
@@ -273,6 +295,23 @@ What we **won't** do:
 - Pretend a report is invalid just because we can't reproduce it — we'll ask for more info instead
 - Merge a breaking API change without a deprecation path, even in a major version
 - Close an issue because it's "old" — old issues get picked up, not swept out
+
+---
+
+## Governance & maintainers
+
+OculiX has two maintainers with full trust on the repository, listed in [`.github/CODEOWNERS`](.github/CODEOWNERS). Either's approval is sufficient to merge, subject to branch protection (required CI green, no direct push to `master`).
+
+| Role | Who | Scope |
+|---|---|---|
+| **Active maintainer** | [@julienmerconsulting](https://github.com/julienmerconsulting) | Day-to-day reviews, releases, issue triage, roadmap |
+| **Emeritus / lineage authority** | [@RaiMan](https://github.com/RaiMan) | Original SikuliX author. Advisory, API stability, historical context |
+
+There are no other maintainers today. If that changes, this section is where it'll be updated — and the promoted contributor will appear in `CODEOWNERS` with either repo-wide or module-scoped trust.
+
+**Becoming a maintainer** isn't a formal process. It's a conversation that opens once a contributor has shipped a handful of solid PRs, triaged issues thoughtfully, and shown judgment on what belongs in the project. If that's you: keep pushing careful PRs and the rest happens on its own.
+
+**Disagreements between maintainers** are resolved by discussion in the issue or PR thread, in public. Nothing gets merged by executive decision with the other maintainer objecting. If we can't agree, the status quo wins until the argument is resolved.
 
 ---
 
