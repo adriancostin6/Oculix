@@ -393,7 +393,11 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
   }
 
   void setButtonText() {
-    setToolTipText(info());
+    if (options != null && options.get(IButton.FILE) != null) {
+      setToolTipText(((File) options.get(IButton.FILE)).getName());
+    } else {
+      setToolTipText(info());
+    }
   }
 
   public static void renameImage(String name, Map<String, Object> options) {
