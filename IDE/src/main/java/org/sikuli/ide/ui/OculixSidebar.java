@@ -209,12 +209,16 @@ public class OculixSidebar extends JPanel {
   /**
    * Section kicker: JetBrains Mono 10, uppercase, 0.18em letter-spacing,
    * ink-300. Replaces the older default-font small grey text.
+   *
+   * <p>Top padding is generous (24px) so the sidebar spreads out and fills
+   * the available height instead of clustering all sections at the top of
+   * the column with a long blank gap below.
    */
   private void addSectionHeader(String text) {
     JLabel header = new JLabel(text == null ? null : text.toUpperCase(java.util.Locale.ROOT));
     header.setFont(applyTracking(OculixFonts.mono(10), 0.18f).deriveFont(Font.BOLD));
     header.setForeground(OculixColors.OX_INK_300);
-    header.setBorder(BorderFactory.createEmptyBorder(14, 2, 6, 0));
+    header.setBorder(BorderFactory.createEmptyBorder(24, 2, 8, 0));
     mainPanel.add(header);
   }
 

@@ -53,7 +53,7 @@ public class WelcomeTab extends JPanel {
     this.onOpen = onOpen;
     this.onNewWorkspace = onNewWorkspace;
     this.onOpenWorkspace = onOpenWorkspace;
-    setLayout(new MigLayout("fill, wrap 1", "[left]", "push[]push"));
+    setLayout(new MigLayout("fill, wrap 1", "[center]", "push[]push"));
     setOpaque(true);
     // Welcome is the brand surface in both modes — always navy with cyan /
     // violet haze + white text, but a touch lighter in OculiX Light so the
@@ -220,12 +220,15 @@ public class WelcomeTab extends JPanel {
     g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-    // Target ~62% of panel height, capped at 580px so it doesn't scream on
-    // big screens. Anchored on the right edge with a comfortable margin.
-    int targetH = Math.min((int) (h * 0.62), 580);
+    // Target ~58% of panel height, capped at 520px so it doesn't scream on
+    // big screens. Positioned slightly past the centered text column so it
+    // reads as part of the same composition rather than glued to the edge.
+    int targetH = Math.min((int) (h * 0.58), 520);
     double scale = (double) targetH / geckoSource.getHeight();
     int targetW = (int) (geckoSource.getWidth() * scale);
-    int x = w - targetW + targetW / 6;       // bleed slightly off the right edge
+    // Centered column is 580px wide; place the gecko's center near 78% of
+    // panel width so its left edge sits right after the text block.
+    int x = (int) (w * 0.78) - targetW / 2;
     int y = (h - targetH) / 2;
 
     g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.28f));
