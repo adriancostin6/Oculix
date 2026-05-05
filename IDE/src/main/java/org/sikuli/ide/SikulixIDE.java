@@ -765,15 +765,30 @@ public class SikulixIDE extends JFrame {
    * scripts are open OR a workspace is loaded. Called after every
    * refreshWorkspace() — the explorer is purely contextual: empty IDE = no
    * workspace and no scripts = collapsed; otherwise visible.
+   *
+   * <p>The setDividerLocation call is wrapped in {@link SwingUtilities#invokeLater}
+   * because {@link JSplitPane} silently ignores divider position changes if
+   * the pane hasn't been fully laid out yet — typical when this is called
+   * synchronously from a workspace-load action triggered by a button click
+   * before the pane has had its first paint pass. invokeLater pushes it
+   * onto the EDT after the current event has finished and the next layout
+   * round has run.
    */
   private void refreshExplorerVisibility() {
     if (editorSplit == null) return;
     boolean hasScripts = !contexts.isEmpty();
     boolean hasWorkspace = currentWorkspaceDir != null;
-    int target = (hasScripts || hasWorkspace) ? EXPLORER_OPEN_WIDTH : 0;
-    if (editorSplit.getDividerLocation() != target) {
+    boolean shouldShow = hasScripts || hasWorkspace;
+    final int target = shouldShow ? EXPLORER_OPEN_WIDTH : 0;
+    SwingUtilities.invokeLater(() -> {
+      if (explorer != null) {
+        explorer.setVisible(shouldShow);
+      }
       editorSplit.setDividerLocation(target);
-    }
+      editorSplit.setDividerSize(shouldShow ? 4 : 0);
+      editorSplit.revalidate();
+      editorSplit.repaint();
+    });
   }
 
   private void initTabs() {
