@@ -779,21 +779,6 @@ public class SikulixIDE extends JFrame {
     // Phase 1c: Use FlatLaf native closeable tabs
     tabs.putClientProperty("JTabbedPane.tabClosable", true);
     tabs.putClientProperty("JTabbedPane.tabCloseToolTipText", "Close");
-    // Force the editor tab bar (where "Welcome" and "*sxtemp1.py" sit) onto the
-    // same surface as the sidebar — paper-100 in OculiX Light, ink-800 in
-    // OculiX Dark. Stops the default Swing white from leaking around the tabs
-    // in light mode and keeps the IDE chrome one continuous brand surface.
-    boolean dkLaf = UIManager.getLookAndFeel().getName().toLowerCase(java.util.Locale.ROOT).contains("dark");
-    String surface = dkLaf ? "#0A1028" : "#F8FAFD";    // ink-800 / paper-100
-    String selected = dkLaf ? "#121A3A" : "#FFFFFF";   // ink-700 / pure white for the active tab
-    tabs.putClientProperty("FlatLaf.style",
-        "background: " + surface + ";"
-        + " contentAreaColor: " + surface + ";"
-        + " selectedBackground: " + selected + ";"
-        + " hoverColor: " + (dkLaf ? "#121A3A" : "#EEF2FA") + ";"
-        + " underlineColor: #1EA5FF;");
-    tabs.setOpaque(true);
-    tabs.setBackground(dkLaf ? new Color(0x0A, 0x10, 0x28) : new Color(0xF8, 0xFA, 0xFD));
     tabs.putClientProperty("JTabbedPane.tabCloseCallback",
         (java.util.function.BiConsumer<JTabbedPane, Integer>) (tabbedPane, tabIndex) -> {
           // Check if this is the welcome tab (not a script context)
@@ -3812,31 +3797,18 @@ public class SikulixIDE extends JFrame {
   private void initMessageArea() {
     messages.init(SHOULD_WRAP_LINE);
     messageArea = new JTabbedPane();
-    // Force the message area's chrome (the strip carrying the MESSAGE tab
-    // title) to the same color as the actual log surface below it: ink-900 in
-    // dark, paper-200 in light. Otherwise FlatLaf renders the tab area lighter
-    // than the content area and we get a visible "white" stripe that doesn't
-    // match the rest of the IDE.
-    boolean darkLaf = UIManager.getLookAndFeel().getName().toLowerCase(java.util.Locale.ROOT).contains("dark");
-    Color msgBg = darkLaf ? new Color(0x05, 0x08, 0x1A) : new Color(0xEE, 0xF2, 0xFA);  // ink-900 / paper-200
-    messageArea.setBackground(msgBg);
-    messageArea.setOpaque(true);
-    messageArea.putClientProperty("FlatLaf.style",
-        "background: " + (darkLaf ? "#05081A" : "#EEF2FA") + ";"
-        + " contentAreaColor: " + (darkLaf ? "#05081A" : "#EEF2FA") + ";");
     messageArea.addTab(_I("paneMessage"), null, messages, "DoubleClick to hide/unhide");
     if (Settings.isWindows() || Settings.isLinux()) {
       messageArea.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
     }
 
     // Branded tab title: JetBrains Mono 10, 0.18em letter-spacing, uppercase.
-    // Color picked per theme for AA contrast against the matching tab strip
-    // bg — cyan-300 on dark navy, deep navy on paper-200.
+    // Color comes from UIManager so it follows the active LaF.
     JLabel tabTitle = new JLabel(_I("paneMessage").toUpperCase(java.util.Locale.ROOT));
     java.util.Map<java.awt.font.TextAttribute, Object> attrs = new java.util.HashMap<>();
     attrs.put(java.awt.font.TextAttribute.TRACKING, 0.18f);
     tabTitle.setFont(new Font("JetBrains Mono", Font.BOLD, 10).deriveFont(attrs));
-    tabTitle.setForeground(darkLaf ? new Color(0x7C, 0xCB, 0xFF) : new Color(0x0B, 0x15, 0x38)); // cyan-300 / paper-800
+    tabTitle.setForeground(UIManager.getColor("Label.disabledForeground"));
     tabTitle.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
     messageArea.setTabComponentAt(0, tabTitle);
     messageArea.addMouseListener(new MouseListener() {
