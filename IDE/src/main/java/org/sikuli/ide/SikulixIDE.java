@@ -3761,6 +3761,17 @@ public class SikulixIDE extends JFrame {
     if (Settings.isWindows() || Settings.isLinux()) {
       messageArea.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
     }
+
+    // Brand the existing tab title: JetBrains Mono 10, 0.18em letter-spacing,
+    // uppercase, ink-300. Matches the sidebar section kickers — typography
+    // becomes the unifying visual signature across the IDE.
+    JLabel tabTitle = new JLabel(_I("paneMessage").toUpperCase(java.util.Locale.ROOT));
+    java.util.Map<java.awt.font.TextAttribute, Object> attrs = new java.util.HashMap<>();
+    attrs.put(java.awt.font.TextAttribute.TRACKING, 0.18f);
+    tabTitle.setFont(new Font("JetBrains Mono", Font.BOLD, 10).deriveFont(attrs));
+    tabTitle.setForeground(new Color(0x7D, 0x8B, 0xC9));   // OX_INK_300
+    tabTitle.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+    messageArea.setTabComponentAt(0, tabTitle);
     messageArea.addMouseListener(new MouseListener() {
       @Override
       public void mouseClicked(MouseEvent me) {

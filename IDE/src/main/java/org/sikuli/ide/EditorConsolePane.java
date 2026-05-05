@@ -89,8 +89,34 @@ public class EditorConsolePane extends JPanel implements Runnable {
     textArea.setEditorKit(kit);
     textArea.setTransferHandler(new JTextPaneHTMLTransferHandler());
     textArea.setEditable(false);
+
+    // Theme-independent console: fixed white background regardless of the
+    // OculiX Dark / Light theme. Logs read identically in both modes — terminal
+    // muscle memory, stable stdout/stderr coloring, no jarring inversion.
+    textArea.setBackground(Color.WHITE);
+    textArea.setForeground(new Color(0x0B, 0x15, 0x38));         // paper-800 (deep navy text)
+    textArea.setCaretColor(new Color(0x0F, 0x8D, 0xDB));         // OX_CYAN_500 (light variant)
+    textArea.setFont(new Font("JetBrains Mono", Font.PLAIN, 12));
+    textArea.setMargin(new Insets(8, 12, 8, 12));
+
+    // Default body color in the HTML stylesheet, plus brand-colored marker
+    // classes that line wrappers can use later (info / ok / err / match).
+    // All colors picked for AA contrast on a white background.
+    javax.swing.text.html.StyleSheet css = ((HTMLEditorKit) textArea.getEditorKit()).getStyleSheet();
+    css.addRule("body { color: #0B1538; font-family: 'JetBrains Mono', monospace; font-size: 12px; }");
+    css.addRule(".ts   { color: #8794B7; }");                    // timestamp gutter, dim
+    css.addRule(".tag  { color: #5A6993; }");                    // [startup] [ocr] tags
+    css.addRule(".info { color: #2F3D6E; }");                    // default info text
+    css.addRule(".ok   { color: #2EA417; }");                    // lime, darkened for white bg
+    css.addRule(".err  { color: #C92A26; }");                    // red, darkened for white bg
+    css.addRule(".match{ color: #0F8DDB; }");                    // cyan, darkened for white bg
+    css.addRule(".dim  { color: #8794B7; }");
+
     setLayout(new BorderLayout());
-    add(new JScrollPane(textArea), BorderLayout.CENTER);
+    JScrollPane sp = new JScrollPane(textArea);
+    sp.setBorder(BorderFactory.createEmptyBorder());
+    sp.getViewport().setBackground(Color.WHITE);
+    add(sp, BorderLayout.CENTER);
 
     //Create the popup menu.
     popup = new JPopupMenu();
