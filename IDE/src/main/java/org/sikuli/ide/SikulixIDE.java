@@ -1887,6 +1887,19 @@ public class SikulixIDE extends JFrame {
     String scriptText = getActiveContext().getPane().getText();
     Lexer lexer = getLexer();
     Map<String, List<Integer>> images = new HashMap<>();
+    // getLexer() returns null when the syntaxhighlight grammar resource for
+    // "python" can't be resolved on the classpath (happens at least on the
+    // Modern Recorder rename flow before the lexers map is populated).
+    // Without this guard, the next call walks the AST with a null Lexer and
+    // throws NPE inside parseforImagesWalk -> the rename action looks
+    // crashed even though the file was already moved on disk and the button
+    // has been re-serialized with the new name. Bail out early — the empty
+    // map is a no-op for the caller (reparseOnRenameImage) and the rename
+    // succeeds visually anyway via the IButton.TEXT update done upstream.
+    if (lexer == null) {
+      log("parseforImages: lexer unavailable for python — skipping text reparse");
+      return images;
+    }
     lineNumber = 0;
     parseforImagesWalk(imageFolder, lexer, scriptText, 0, images);
     trace("parseforImages finished");
