@@ -284,7 +284,11 @@ public class EditorConsolePane extends JPanel implements Runnable {
     boolean dark = isDarkLaf();
     String normal = dark ? "#BBBBBB" : "#2F3D6E";
     String error  = dark ? "#FF6B6B" : "#C92A26";
-    String debug  = dark ? "#C0A000" : "#8B6500";
+    // Debug in light mode dropped from yellow (#8B6500 = mustard) to a
+    // muted slate-blue: yellow on near-white is unreadable, slate-blue
+    // semantically reads as "secondary / low-priority detail" which fits
+    // debug messages and stays legible on paper-100.
+    String debug  = dark ? "#C0A000" : "#5A6993";
     String log    = dark ? "#3DDBA4" : "#2EA417";
     String info   = dark ? "#6CB6FF" : "#0F8DDB";
 
