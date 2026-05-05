@@ -4,9 +4,9 @@
 package org.sikuli.ide.ui;
 
 import com.formdev.flatlaf.FlatClientProperties;
-import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLaf;
-import com.formdev.flatlaf.FlatLightLaf;
+import org.sikuli.ide.theme.OculixDarkLaf;
+import org.sikuli.ide.theme.OculixLightLaf;
 import net.miginfocom.swing.MigLayout;
 import org.sikuli.basics.PreferencesUser;
 
@@ -306,7 +306,7 @@ public class OculixSidebar extends JPanel {
   private void toggleTheme() {
     isDark = !isDark;
     try {
-      if (isDark) FlatDarkLaf.setup(); else FlatLightLaf.setup();
+      if (isDark) OculixDarkLaf.setup(); else OculixLightLaf.setup();
       FlatLaf.updateUI();
       PreferencesUser prefs = PreferencesUser.get();
       prefs.setIdeTheme(isDark ? PreferencesUser.THEME_DARK : PreferencesUser.THEME_LIGHT);
