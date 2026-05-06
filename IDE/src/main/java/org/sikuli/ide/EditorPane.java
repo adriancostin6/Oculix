@@ -1142,14 +1142,8 @@ public class EditorPane extends JTextPane implements ThemeAware {
         SikulixIDE ide = SikulixIDE.get();
 
         try {
-          // No auto-clear: previous run output (and the boot startup lines)
-          // stays in the console so the full session history is preserved.
-          // A visible run separator is logged below to make run boundaries
-          // obvious. Users who want a fresh console can right-click →
-          // "Clear messages" or trigger ide.clearMessageArea() explicitly.
+          ide.clearMessageArea();
           ide.resetErrorMark();
-          String stamp = new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date());
-          org.sikuli.basics.Debug.log(0, "──────── Run started @ %s ────────", stamp);
 
           if (null != context.getSupport()) {
             context.getRunner().runLines(context.getSupport().normalizePartialScript(lines), null);
