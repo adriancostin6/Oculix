@@ -96,9 +96,6 @@ public class EditorConsolePane extends JPanel implements Runnable {
     // which made Swing's limited CSS parser collide with the htmlize()
     // inline <pre style="..."> output and broke log rendering completely).
     boolean dark = isDarkLaf();
-    String lafName = javax.swing.UIManager.getLookAndFeel().getName();
-    String lafClass = javax.swing.UIManager.getLookAndFeel().getClass().getName();
-    org.sikuli.basics.Debug.error("[CONSOLE-INIT] LaF.name='%s' class='%s' isDarkLaf=%s", lafName, lafClass, dark);
     Color bg = dark ? new Color(0x05, 0x08, 0x1A) : new Color(0xF8, 0xFA, 0xFD);
     Color caret = dark ? new Color(0x1E, 0xA5, 0xFF) : new Color(0x0F, 0x8D, 0xDB);
     textArea.setBackground(bg);
@@ -127,10 +124,21 @@ public class EditorConsolePane extends JPanel implements Runnable {
     textArea.addMouseListener(popupListener);
   }
 
-  /** True when the active LaF is the OculiX Dark theme. */
+  /**
+   * True when the user's IDE theme preference is set to dark.
+   * <p>
+   * Reads {@link org.sikuli.basics.PreferencesUser#getIdeTheme()} — the same
+   * source of truth that {@code Sikulix.main()} uses to decide which LaF to
+   * install at startup. This is deliberately independent of
+   * {@code UIManager.getLookAndFeel()}, which can return a transient state at
+   * the moment {@code EditorConsolePane.init()} runs (e.g. when AWT image
+   * loading via {@code setIconImage()} primes Swing UIDefaults before FlatLaf
+   * is fully resolved). Reading the user preference removes any timing
+   * dependency on the Swing init order.
+   */
   private static boolean isDarkLaf() {
-    String name = UIManager.getLookAndFeel().getName();
-    return name != null && name.toLowerCase(java.util.Locale.ROOT).contains("dark");
+    String theme = org.sikuli.basics.PreferencesUser.get().getIdeTheme();
+    return !org.sikuli.basics.PreferencesUser.THEME_LIGHT.equals(theme);
   }
 
   private HTMLEditorKit editorKitWithLineWrap() {
