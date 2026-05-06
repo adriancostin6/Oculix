@@ -3797,8 +3797,9 @@ public class SikulixIDE extends JFrame {
           }
 
           RunTime.pause(0.1f);
-          clearMessageArea();
           resetErrorMark();
+          String runStamp = new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date());
+          Debug.log(0, "──────── Run started @ %s ────────", runStamp);
           doBeforeRun();
 
           long runStart = System.currentTimeMillis();
