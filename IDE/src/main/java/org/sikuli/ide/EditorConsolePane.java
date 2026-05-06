@@ -96,6 +96,9 @@ public class EditorConsolePane extends JPanel implements Runnable {
     // which made Swing's limited CSS parser collide with the htmlize()
     // inline <pre style="..."> output and broke log rendering completely).
     boolean dark = isDarkLaf();
+    String lafName = javax.swing.UIManager.getLookAndFeel().getName();
+    String lafClass = javax.swing.UIManager.getLookAndFeel().getClass().getName();
+    org.sikuli.basics.Debug.error("[CONSOLE-INIT] LaF.name='%s' class='%s' isDarkLaf=%s", lafName, lafClass, dark);
     Color bg = dark ? new Color(0x05, 0x08, 0x1A) : new Color(0xF8, 0xFA, 0xFD);
     Color caret = dark ? new Color(0x1E, 0xA5, 0xFF) : new Color(0x0F, 0x8D, 0xDB);
     textArea.setBackground(bg);
