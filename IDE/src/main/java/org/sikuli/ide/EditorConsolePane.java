@@ -51,6 +51,10 @@ public class EditorConsolePane extends JPanel implements Runnable, ThemeAware {
   private boolean quit;
   private PipedInputStream[] pin;
   private JPopupMenu popup;
+  // Raw line buffer kept alongside the htmlized scrollback so afterThemeChange
+  // can re-render every existing line under the new palette. Without this the
+  // scrollback would freeze in the colors it had at insertion time.
+  private final java.util.List<String> rawLines = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
   Thread errorThrower; // just for testing (Throws an Exception at this Console)
 
   class PopupListener extends MouseAdapter {
@@ -165,6 +169,22 @@ public class EditorConsolePane extends JPanel implements Runnable, ThemeAware {
   @Override
   public void afterThemeChange() {
     applyThemeColors();
+    // Re-render every line of scrollback under the new palette so existing
+    // logs match the new theme (otherwise they keep the colors they had at
+    // insertion time). Cheap in practice — typical scrollback is < a few
+    // hundred lines.
+    if (textArea != null) {
+      synchronized (textArea) {
+        java.util.List<String> snapshot;
+        synchronized (rawLines) {
+          snapshot = new java.util.ArrayList<>(rawLines);
+        }
+        textArea.setText("");
+        for (String line : snapshot) {
+          appendMsg(htmlize(line));
+        }
+      }
+    }
     revalidate();
     repaint();
   }
@@ -373,6 +393,7 @@ public class EditorConsolePane extends JPanel implements Runnable, ThemeAware {
             final String finalInput = input;
             EventQueue.invokeLater(() -> {
               synchronized (textArea) {
+                rawLines.add(finalInput);
                 appendMsg(htmlize(finalInput));
                 int textLen = textArea.getDocument().getLength();
                 if (textLen > 0) {
@@ -412,6 +433,7 @@ public class EditorConsolePane extends JPanel implements Runnable, ThemeAware {
 
   public void clear() {
     textArea.setText("");
+    rawLines.clear();
   }
 }
 
