@@ -347,11 +347,21 @@ public class OculixSidebar extends JPanel {
   private void toggleTheme() {
     isDark = !isDark;
     try {
-      if (isDark) OculixDarkLaf.setup(); else OculixLightLaf.setup();
-      FlatLaf.updateUI();
+      // Persist the new theme BEFORE installing the LaF so any component
+      // that reads PreferencesUser.getIdeTheme() during the swap (e.g.
+      // EditorConsolePane.applyThemeColors) sees the right value already.
       PreferencesUser prefs = PreferencesUser.get();
       prefs.setIdeTheme(isDark ? PreferencesUser.THEME_DARK : PreferencesUser.THEME_LIGHT);
       prefs.store();
+      if (isDark) OculixDarkLaf.setup(); else OculixLightLaf.setup();
+      FlatLaf.updateUI();
+      // Force a full LaF propagation on every visible top-level window,
+      // including detached frames (Preferences, More options, splash).
+      // FlatLaf.updateUI() walks the JFrame tree but stale references on
+      // some windows can keep the old LaF until the next focus event.
+      for (java.awt.Window w : java.awt.Window.getWindows()) {
+        if (w.isDisplayable()) SwingUtilities.updateComponentTreeUI(w);
+      }
     } catch (Exception ex) {}
   }
 
