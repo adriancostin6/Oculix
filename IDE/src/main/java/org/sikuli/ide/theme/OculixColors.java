@@ -17,6 +17,9 @@ import java.awt.Color;
  *
  * <p>Naming convention: {@code OX_<HUE>_<TONE>} where the tone follows a
  * Tailwind-like 100..900 scale (lower = lighter, higher = darker).
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public final class OculixColors {
 

@@ -6,6 +6,11 @@ import org.sikuli.support.Commons;
 import org.sikuli.support.RunTime;
 
 import java.awt.*;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 public class MouseDevice extends Devices {
 

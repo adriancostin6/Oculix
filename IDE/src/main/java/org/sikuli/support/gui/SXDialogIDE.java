@@ -3,6 +3,11 @@ package org.sikuli.support.gui;
 import org.sikuli.ide.SikulixIDE;
 
 import java.awt.*;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 public class SXDialogIDE extends SXDialog {
 

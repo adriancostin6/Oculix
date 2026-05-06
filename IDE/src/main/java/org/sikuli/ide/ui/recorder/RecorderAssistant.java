@@ -19,6 +19,9 @@ import java.nio.file.Files;
  * Non-modal floating dialog for the OculiX Modern Recorder.
  * Stays on top while the user interacts with the target application.
  * Delegates to RecorderActions, RecorderCodeGen, RecorderAppScope, RecorderImagePicker.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class RecorderAssistant extends JDialog {
 

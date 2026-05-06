@@ -21,6 +21,9 @@ import java.io.InputStream;
  * <p>The class is fail-soft: if a TTF/OTF is missing or fails to register,
  * {@link #setup()} logs a warning and the IDE falls back to system fonts
  * (Segoe UI / SF Pro / Dialog) automatically — no crash, just less brand.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public final class OculixFonts {
 

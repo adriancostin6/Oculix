@@ -16,6 +16,11 @@ import org.sikuli.natives.SXUser32;
 import com.sun.jna.platform.win32.WinDef.HKL;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import org.sikuli.script.Key;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 public class KeyboardLayout {
   private static final int DEFAULT_KEYBOARD_LAYOUT_ID = 0x0409; // en-US;

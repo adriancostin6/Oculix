@@ -16,6 +16,9 @@ import java.util.Date;
  * Modal dialog for creating a new workspace.
  * Collects name, description, author, then lets the user choose a directory.
  * Creates a workspace.json file in the selected directory.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class WorkspaceDialog extends JDialog {
 

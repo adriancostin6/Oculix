@@ -18,6 +18,9 @@ import com.formdev.flatlaf.FlatLightLaf;
  * <p>Counterpart of {@link OculixDarkLaf}; the IDE picks one or the other
  * based on {@code PreferencesUser.get().getIdeTheme()} at startup, and
  * {@link OculixSidebar} swaps between them on the Dark / Light toggle.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class OculixLightLaf extends FlatLightLaf {
 

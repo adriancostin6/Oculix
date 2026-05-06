@@ -16,6 +16,9 @@ import java.awt.Rectangle;
  * An extension of DesktopScreen, that uses all active monitors as one big screen
  *
  * TO BE EVALUATED: is this really needed?
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class ScreenUnion extends Screen {
 

@@ -13,6 +13,9 @@ import org.sikuli.script.*;
 /**
  * EXPERIMENTAL --- INTERNAL USE ONLY<br>
  *   is not official API --- will not be in version 2
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class Device {
 

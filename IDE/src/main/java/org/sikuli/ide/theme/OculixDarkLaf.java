@@ -25,6 +25,9 @@ import com.formdev.flatlaf.FlatLaf;
  * <p>Equivalent of {@link FlatDarkLaf#setup()} but with the OculiX skin layered
  * on. If a hostile classpath / resource issue prevents loading the .properties,
  * we fall back to a vanilla {@code FlatDarkLaf} so the IDE still launches.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class OculixDarkLaf extends FlatDarkLaf {
 

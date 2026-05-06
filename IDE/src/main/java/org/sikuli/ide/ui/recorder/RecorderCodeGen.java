@@ -10,6 +10,11 @@ import org.sikuli.support.recorder.generators.RobotFrameworkCodeGenerator;
 
 import javax.swing.*;
 import java.io.File;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 class RecorderCodeGen {
 

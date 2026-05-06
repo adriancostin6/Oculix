@@ -35,6 +35,9 @@ import java.util.Map;
  * <p>Background: subtle radial gradient haze (violet upper-left, cyan upper-right)
  * painted in {@link #paintComponent(Graphics)}. Cached to a BufferedImage on
  * resize so we don't repaint the gradient on every event.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class WelcomeTab extends JPanel {
 

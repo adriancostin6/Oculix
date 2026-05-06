@@ -11,6 +11,11 @@ import org.sikuli.support.devices.ScreenDevice;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 public class SXDialogPaneImage extends SXDialogIDE {
   public SXDialogPaneImage(Point where, Object... parms) {

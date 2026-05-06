@@ -19,6 +19,9 @@ import java.util.List;
  * Workspace explorer showing open scripts as visual cards.
  * Each card represents a script (.sikuli bundle or temp script).
  * Clicking a card activates the corresponding editor tab.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class ScriptExplorer extends JPanel implements org.sikuli.ide.ThemeAware {
 

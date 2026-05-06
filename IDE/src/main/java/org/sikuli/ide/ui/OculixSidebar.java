@@ -28,6 +28,9 @@ import static org.sikuli.support.ide.SikuliIDEI18N._I;
 
 /**
  * Vertical sidebar with navigation submenus and live info panels.
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 public class OculixSidebar extends JPanel {
 

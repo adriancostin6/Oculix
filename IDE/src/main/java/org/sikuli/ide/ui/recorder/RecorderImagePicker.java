@@ -9,6 +9,11 @@ import org.sikuli.script.ScreenImage;
 import javax.swing.*;
 import java.io.File;
 import java.util.List;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 class RecorderImagePicker {
 

@@ -4,6 +4,11 @@ import org.sikuli.ide.EditorPane;
 import org.sikuli.support.runner.IRunner;
 
 import javax.swing.text.Caret;
+/**
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
+ */
 
 public interface IAutoCompleter {
 

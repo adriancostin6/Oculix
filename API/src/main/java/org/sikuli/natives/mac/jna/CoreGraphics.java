@@ -11,6 +11,9 @@ import com.sun.jna.platform.mac.CoreFoundation.CFStringRef;
 
 /**
  * JNA bindings to CoreGraphics *
+ * @author Julien Mer (julienmerconsulting)
+ * @author Claude (Anthropic)
+ * @since 3.0.3
  */
 
 public interface CoreGraphics extends Library {
