@@ -5,10 +5,11 @@ package org.sikuli.ide;
 
 import org.apache.commons.io.FilenameUtils;
 import org.sikuli.basics.Debug;
+import org.sikuli.script.Screen;
 import org.sikuli.support.FileManager;
 import org.sikuli.script.Location;
 import org.sikuli.script.ScreenImage;
-import org.sikuli.support.devices.ScreenUnion;
+//import org.sikuli.support.devices.ScreenUnion;
 import org.sikuli.support.ide.SikuliIDEI18N;
 import org.sikuli.support.gui.notused.PatternPaneNaming;
 
@@ -238,7 +239,8 @@ public class PatternWindow extends JFrame {
 			Thread.sleep(500);
 		} catch (Exception e) {
 		}
-		ScreenImage img = (new ScreenUnion()).getScreen().capture();
+		//TODO Another concept needed, to present the current screen content even in multi-screen environments
+		ScreenImage img = Screen.getPrimaryScreen().capture(); //(new ScreenUnion()).getScreen().capture();
 		SikulixIDE.showAgain();
 		this.setVisible(true);
 		this.requestFocus();
