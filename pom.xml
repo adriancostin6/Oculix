@@ -35,6 +35,11 @@
   </scm>
 
   <modules>
+    <!-- build-extensions is the Maven core extension that prints the OculiX
+         gecko banner on every mvn invocation. Listed FIRST so it builds
+         and installs before the rest of the reactor — that way the very
+         next mvn run already loads it via .mvn/extensions.xml. -->
+    <module>build-extensions</module>
     <module>API</module>
     <module>IDE</module>
     <module>MCP</module>

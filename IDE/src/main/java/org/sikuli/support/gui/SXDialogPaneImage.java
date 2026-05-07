@@ -92,8 +92,21 @@ public class SXDialogPaneImage extends SXDialogIDE {
 
   public void pattern() {
     closeCancel();
-    prepare();
-    new SXDialogPaneImagePattern(ideWindow.getLocation(), new String[]{"image", "shot", "pattern"},
-        getOptions().get("image"), actualImage).run();
+    // "As Pattern" used to open SXDialogPaneImagePattern — a SikuliX1 stub
+    // (13-line empty class) whose descriptor sxidepaneimagepattern.txt
+    // displayed a {shot} item, i.e. the FULL screen capture taken in
+    // prepare(). Result: clicking "As Pattern" opened a fullscreen window
+    // showing the whole desktop instead of any pattern-editing UI.
+    //
+    // Conceptually, "As Pattern" and "Optimize" both promote/edit a pattern
+    // — same destination, same editor. Routing both to PatternWindow
+    // unifies the UX. The dedicated SikuliX1 stub stays in the codebase
+    // (inherited path) but no longer sits on the menu's click path.
+    final Object btn = getOptions().get("imgBtn");
+    if (!(btn instanceof EditorImageButton)) {
+      Debug.error("SXDialogPaneImage.pattern: no EditorImageButton in options (key 'imgBtn')");
+      return;
+    }
+    new PatternWindow(btn);
   }
 }
