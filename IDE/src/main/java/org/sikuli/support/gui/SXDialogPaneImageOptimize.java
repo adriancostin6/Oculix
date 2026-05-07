@@ -5,11 +5,6 @@ import org.sikuli.support.devices.ScreenDevice;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-/**
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
- */
 
 public class SXDialogPaneImageOptimize extends SXDialogIDE {
   public SXDialogPaneImageOptimize(Point where, Object... parms) {

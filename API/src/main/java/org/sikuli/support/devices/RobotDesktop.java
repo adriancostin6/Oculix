@@ -30,9 +30,6 @@ import java.util.Date;
 
 /**
  * INTERNAL USE Implementation of IRobot making a DesktopRobot using java.awt.Robot
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
  */
 public class RobotDesktop extends Robot implements IRobot {
 

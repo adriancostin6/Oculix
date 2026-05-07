@@ -6,11 +6,6 @@ import org.sikuli.support.RunTime;
 import java.awt.AWTException;
 import java.awt.Robot;
 import java.util.Map;
-/**
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
- */
 
 public abstract class Devices {
 

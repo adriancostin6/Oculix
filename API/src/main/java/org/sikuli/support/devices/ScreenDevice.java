@@ -9,11 +9,6 @@ import org.sikuli.util.OverlayCapturePrompt;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.atomic.AtomicBoolean;
-/**
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
- */
 
 public class ScreenDevice extends Devices {
 

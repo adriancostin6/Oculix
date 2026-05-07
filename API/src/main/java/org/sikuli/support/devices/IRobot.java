@@ -12,9 +12,6 @@ import java.awt.Rectangle;
 /**
  * INTERNAL USE <br>
  * function template for (alternative) Robot implementations
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
  */
 public interface IRobot {
    enum KeyMode {

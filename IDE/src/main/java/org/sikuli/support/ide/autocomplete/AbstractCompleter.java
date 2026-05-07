@@ -8,11 +8,6 @@ import javax.swing.text.Caret;
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
-/**
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
- */
 
 public abstract class AbstractCompleter implements IAutoCompleter {
 

@@ -11,11 +11,6 @@ import org.sikuli.util.Highlight;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-/**
- * @author Julien Mer (julienmerconsulting)
- * @author Claude (Anthropic)
- * @since 3.0.3
- */
 
 public class HelpDevice extends Devices {
 
