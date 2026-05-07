@@ -359,24 +359,13 @@ public class OculixSidebar extends JPanel {
       if (isDark) OculixDarkLaf.setup(); else OculixLightLaf.setup();
       FlatLaf.updateUI();
       // Force a full LaF propagation on every visible top-level window,
-      // including detached frames (Preferences, More options, splash,
-      // PatternWindow). Per-window try/catch so a failure on one window
-      // does not abort the cascade and so we capture the actual stack
-      // trace instead of silently swallowing it (was a previous source
-      // of "theme toggle breaks everything with no log").
+      // including detached frames (Preferences, More options, splash).
+      // FlatLaf.updateUI() walks the JFrame tree but stale references on
+      // some windows can keep the old LaF until the next focus event.
       for (java.awt.Window w : java.awt.Window.getWindows()) {
-        if (!w.isDisplayable()) continue;
-        try {
-          SwingUtilities.updateComponentTreeUI(w);
-        } catch (Throwable t) {
-          org.sikuli.basics.Debug.error(
-              "OculixSidebar.toggleTheme: updateComponentTreeUI failed on %s: %s",
-              w.getClass().getName(), t);
-        }
+        if (w.isDisplayable()) SwingUtilities.updateComponentTreeUI(w);
       }
-    } catch (Exception ex) {
-      org.sikuli.basics.Debug.error("OculixSidebar.toggleTheme: %s", ex);
-    }
+    } catch (Exception ex) {}
   }
 
   public boolean isDarkTheme() { return isDark; }
