@@ -28,9 +28,22 @@ public class SXDialogPaneImage extends SXDialogIDE {
 
   private void prepare() {
     ideWindow = getIdeWindow();
-    final ScreenDevice scr = ScreenDevice.getScreenDeviceForPoint(ideWindow.getLocation());
+    // Resolve the screen hosting the IDE window with progressive fallback:
+    //  1. center point — robust if the window has been dragged partially off-screen
+    //  2. top-left corner — original behaviour, kept for compat
+    //  3. primary screen — last resort instead of a fatal terminate
+    final Point center = new Point(
+        ideWindow.x + ideWindow.width / 2,
+        ideWindow.y + ideWindow.height / 2);
+    ScreenDevice scr = ScreenDevice.getScreenDeviceForPoint(center);
     if (scr == null) {
-      RunTime.terminate(999, "SXDialogPaneImage: prepare(): ideWindow.getLocation(): should be on a valid screen");
+      scr = ScreenDevice.getScreenDeviceForPoint(ideWindow.getLocation());
+    }
+    if (scr == null) {
+      scr = ScreenDevice.primary();
+    }
+    if (scr == null) {
+      RunTime.terminate(999, "SXDialogPaneImage: prepare(): no screen available for IDE window");
     }
     SikulixIDE.doHide();
     scrImage = scr.capture();
