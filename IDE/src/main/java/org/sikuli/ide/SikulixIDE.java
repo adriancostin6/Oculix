@@ -2377,6 +2377,28 @@ public class SikulixIDE extends JFrame {
       for (File file : filesToLoad) {
         createFileContext(file);
       }
+      // Auto-run the -l preloaded script if -e was passed. Triggered HERE
+      // (not from showAfterStart) so the run fires right after the file
+      // has been loaded into its context — same effective sequence as
+      // a user clicking the Run button after opening a script. The
+      // showAfterStart path was racing the EDT pulse responsible for
+      // realising ideWindow.setVisible(true), causing the auto-run to
+      // silently no-op even when shouldExecuteOnStart was true (#224,
+      // reported by @micves on the -c -e -l combo, reproduced by
+      // @julienmerconsulting on -l <path> -e on Windows).
+      if (shouldExecuteOnStart) {
+        Commons.startLog(3, "-e: scheduling auto-run after -l preload");
+        SwingUtilities.invokeLater(() -> {
+          if (btnRun != null) {
+            Commons.startLog(3, "-e: pressing Run on the preloaded script");
+            btnRun.runCurrentScript();
+          } else {
+            Commons.startLog(3, "-e: btnRun not initialised, skipping auto-run");
+          }
+        });
+        // Consumed — clear the flag so showAfterStart does not double-fire.
+        shouldExecuteOnStart = false;
+      }
       // Close the initial empty script if it was created before session restore
       if (contexts.size() > filesToLoad.size()) {
         PaneContext firstCtx = getContextAt(0);
