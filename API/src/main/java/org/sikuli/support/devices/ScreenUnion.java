@@ -22,7 +22,7 @@ public class ScreenUnion extends Screen {
   private Rectangle _bounds;
 
   public ScreenUnion() {
-    super(true);
+    //super(true); already removed in Screen
     _bounds = new Rectangle();
     for (int i = 0; i < Screen.getNumberScreens(); i++) {
       _bounds = _bounds.union(Screen.getBounds(i));
