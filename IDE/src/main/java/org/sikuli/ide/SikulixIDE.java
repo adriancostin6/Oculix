@@ -1805,6 +1805,24 @@ public class SikulixIDE extends JFrame {
             continue;
           }
           EditorImageButton button = new EditorImageButton(item);
+          // If the captured TEXT was a Pattern(...).chain expression, replay
+          // the parsed modifiers onto the freshly built button so its
+          // internal state matches what the script encoded. setParameters
+          // also flips _isPattern, which both makes the badge visible and
+          // keeps File ▸ Save round-tripping the chain.
+          String capturedText = (String) item.get(IButton.TEXT);
+          if (capturedText != null && capturedText.startsWith("Pattern(")) {
+            Object simObj = item.get("PATTERN_SIMILAR");
+            double sim = simObj instanceof Double ? (Double) simObj : 0.7;
+            boolean exact = Boolean.TRUE.equals(item.get("PATTERN_EXACT"));
+            button.setParameters(exact, sim, 0);
+            Object ox = item.get("PATTERN_OFFSET_X");
+            Object oy = item.get("PATTERN_OFFSET_Y");
+            if (ox instanceof Integer && oy instanceof Integer) {
+              button.setTargetOffset(
+                  new org.sikuli.script.Location((Integer) ox, (Integer) oy));
+            }
+          }
           javax.swing.text.SimpleAttributeSet attr = new javax.swing.text.SimpleAttributeSet();
           javax.swing.text.StyleConstants.setComponent(attr, button);
           doc.remove(itemStart, itemLen);
@@ -1834,6 +1852,21 @@ public class SikulixIDE extends JFrame {
       return patterns;
     }
 
+    // Optional Pattern(...) wrap with arbitrary chained modifiers like
+    //   Pattern("name.png").similar(0.85).exact().targetOffset(10,5).resize(2)
+    // We extend the basic "name.png" match to cover the whole chain so that
+    // when doShowThumbs swaps the literal for the inline button, it
+    // SUBSTITUTES THE FULL EXPRESSION — visible code becomes
+    //   wait(<image>, 10)
+    // instead of the cluttered
+    //   wait(Pattern("name.png").similar(0.85), 10)
+    // Modifier values are parsed from the chain and applied to the button
+    // via setParameters / setTargetOffset so that Optimize finds the right
+    // initial state and File ▸ Save round-trips the chain unchanged.
+    private static final Pattern CHAIN_MODIFIER = Pattern.compile("\\.\\w+\\([^)]*\\)");
+    private static final Pattern SIMILAR_PARSE  = Pattern.compile("\\.similar\\(([-0-9.eE]+)\\)");
+    private static final Pattern OFFSET_PARSE   = Pattern.compile("\\.targetOffset\\(\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)");
+
     private List<Map<String, Object>> imageMatcher(List<Map<String, Object>> images, String[] text, Pattern pat) {
       for (int lnNbr = 0; lnNbr < text.length; lnNbr++) {
         String line = text[lnNbr];
@@ -1845,14 +1878,55 @@ public class SikulixIDE extends JFrame {
           String match = matcher.group(1);
           if (match != null) {
             int start = matcher.start(1);
+            int end = matcher.end(1);
             String imgName = match.substring(1, match.length() - 1);
             final File imgFile = imageExists(imgName);
             if (imgFile != null) {
+              int extStart = start;
+              int extEnd = end;
+              // Look for "Pattern(" prefix immediately before the quoted
+              // filename. If found AND the next char after the closing
+              // quote is ')', extend the span to cover the full
+              // Pattern(...).modifier(...)... chain.
+              if (start >= 8 && "Pattern(".equals(line.substring(start - 8, start))
+                  && end < line.length() && line.charAt(end) == ')') {
+                extStart = start - 8;
+                extEnd = end + 1; // include the ')' that closes Pattern(...)
+                // Greedy: consume each ".name(...)" modifier one by one.
+                while (extEnd < line.length()) {
+                  Matcher mm = CHAIN_MODIFIER.matcher(line);
+                  if (mm.region(extEnd, line.length()).useAnchoringBounds(true).lookingAt()) {
+                    extEnd = mm.end();
+                  } else {
+                    break;
+                  }
+                }
+              }
+              String fullText = line.substring(extStart, extEnd);
               Map<String, Object> options = new HashMap<>();
-              options.put(IButton.TEXT, match);
+              options.put(IButton.TEXT, fullText);
               options.put(IButton.LINE, lnNbr);
-              options.put(IButton.LOFF, start);
+              options.put(IButton.LOFF, extStart);
               options.put(IButton.FILE, imgFile);
+              // Pre-parse modifiers from the chain so doShowThumbs can
+              // re-apply them on the freshly-built EditorImageButton.
+              if (extEnd > end) {
+                Matcher sm = SIMILAR_PARSE.matcher(fullText);
+                if (sm.find()) {
+                  try { options.put("PATTERN_SIMILAR", Double.parseDouble(sm.group(1))); }
+                  catch (NumberFormatException ignore) { }
+                }
+                if (fullText.contains(".exact()")) {
+                  options.put("PATTERN_EXACT", Boolean.TRUE);
+                }
+                Matcher om = OFFSET_PARSE.matcher(fullText);
+                if (om.find()) {
+                  try {
+                    options.put("PATTERN_OFFSET_X", Integer.parseInt(om.group(1)));
+                    options.put("PATTERN_OFFSET_Y", Integer.parseInt(om.group(2)));
+                  } catch (NumberFormatException ignore) { }
+                }
+              }
               images.add(options);
             }
           }

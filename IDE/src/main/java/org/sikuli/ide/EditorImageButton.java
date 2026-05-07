@@ -243,12 +243,16 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
   }
 
   /**
-   * Default similarity baseline for the "As Pattern" promotion. Sikuli's
-   * Pattern() default is 0.7, so picking 0.85 ensures the badge actually
-   * renders (drawDecoration only paints when similarity differs from the
-   * default — at 0.7 there is no visible change).
+   * SikuliX historical default similarity. "As Pattern" pins the button to
+   * this value so the resulting code reads as the canonical
+   * {@code Pattern("name.png")} (no explicit {@code .similar(...)} suffix
+   * since the value matches the API default). The badge always paints once
+   * a button has been promoted, regardless of the similar value, so the
+   * user always sees feedback that the promotion took effect — the prior
+   * choice of 0.85-as-default existed only to force the badge to render
+   * under a stricter "differ from default" rule that has been removed.
    */
-  private static final double AS_PATTERN_DEFAULT_SIMILAR = 0.85;
+  private static final double AS_PATTERN_DEFAULT_SIMILAR = 0.7;
   private static final double DEFAULT_SIMILAR = 0.7;
 
   /**
@@ -324,7 +328,14 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
     Graphics2D g2d = (Graphics2D) g;
     g2d.setColor(new Color(0, 128, 128, 128));
     g2d.drawRoundRect(3, 3, getWidth() - 7, getHeight() - 7, 5, 5);
-    if (_isPattern && _similar != DEFAULT_SIMILAR) {
+    // The badge always renders once the button has been promoted to a
+    // Pattern, regardless of whether the similar value matches the
+    // historical default 0.70. It serves as the visual marker
+    // "this is a Pattern, not a plain image" — same role as the green
+    // dot in legacy SikuliX. Without this, an As Pattern click that
+    // landed on default 0.70 produced no visible change → users
+    // thought the action did nothing.
+    if (_isPattern) {
       drawSimilarBadge(g2d);
     }
   }
