@@ -440,10 +440,7 @@ public class SikulixIDE extends JFrame {
       sikulixIDE.getActiveContext().focus();
     }
     if (shouldExecuteOnStart) {
-      // Same routing rationale as the parser diagnostic in restoreSession:
-      // Commons.startLog(3, ...) always prints regardless of -v, so the
-      // tester sees these lines in the message panel without extra flags.
-      Commons.startLog(3, "-e: auto-running preloaded script");
+      Debug.log(3, "-e: auto-running preloaded script");
       // Defer to a clean EDT pulse so that ideWindow.setVisible(true) above
       // has had time to fully realise before runCurrentScript hides it again
       // via doHide(). Reported on #224 (micves) that on Windows the combo
@@ -454,22 +451,14 @@ public class SikulixIDE extends JFrame {
       // without changing semantics on platforms where the inline call
       // already worked (Linux/macOS reproduce no issue).
       SwingUtilities.invokeLater(() -> {
-        Commons.startLog(3, "-e: invoking runCurrentScript()");
+        Debug.log(3, "-e: invoking runCurrentScript()");
         if (sikulixIDE.btnRun == null) {
-          Commons.startLog(3, "-e: btnRun not initialised, cannot auto-run");
+          Debug.error("-e: btnRun not initialised, cannot auto-run");
           return;
         }
         if (sikulixIDE.contexts.isEmpty()) {
-          Commons.startLog(3, "-e: no preloaded script context, nothing to auto-run");
+          Debug.error("-e: no preloaded script context, nothing to auto-run");
           return;
-        }
-        Commons.startLog(3, "-e: contexts.size=%d, activeContext exists=%s",
-            sikulixIDE.contexts.size(),
-            sikulixIDE.getActiveContext() != null);
-        if (sikulixIDE.getActiveContext() != null) {
-          int len = sikulixIDE.getActiveContext().getPane()
-              .getDocument().getLength();
-          Commons.startLog(3, "-e: active context doc length=%d", len);
         }
         sikulixIDE.btnRun.runCurrentScript();
       });
