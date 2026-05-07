@@ -212,9 +212,31 @@ class PatternPaneTargetOffset extends JPanel implements
 	public void mouseExited(MouseEvent me) {
 	}
 
+	private int _paintLogCount = 0;
+
 	@Override
 	public void paintComponent(Graphics g) {
 		Graphics2D g2d = (Graphics2D) g;
+		// Capped diag (max 10 lines) to capture the paint state when the user
+		// reports "le décalage de la cible casse au passage dark→light, image
+		// avec fond disparue, pas de log d'erreur". Logs the dimensions, async
+		// state and resizable rect visibility — enough to identify which value
+		// is missing/zero at the moment of the visual break.
+		if (_paintLogCount < 10) {
+			_paintLogCount++;
+			String theme;
+			try {
+				theme = org.sikuli.basics.PreferencesUser.get().getIdeTheme();
+			} catch (Throwable t) { theme = "?"; }
+			org.sikuli.basics.Debug.log(2,
+				"PatternPaneTargetOffset.paint #%d: theme=%s w=%d h=%d _img=%s _match=%s _zoomRatio=%.4f _viewW=%d _viewH=%d _viewX=%d _viewY=%d resizableRect.visible=%s",
+				_paintLogCount, theme,
+				getWidth(), getHeight(),
+				_img == null ? "null" : (_img.getWidth() + "x" + _img.getHeight()),
+				_match == null ? "null" : ("@" + _match.x + "," + _match.y + " " + _match.w + "x" + _match.h),
+				_zoomRatio, _viewW, _viewH, _viewX, _viewY,
+				resizableRect == null ? "null-rect" : Boolean.toString(resizableRect.isVisible()));
+		}
 		if (getWidth() > 0 && getHeight() > 0) {
 			// _img / _match populate from an async findTarget() thread (see ctor).
 			// Paint cycles triggered by initial layout, theme toggle's
