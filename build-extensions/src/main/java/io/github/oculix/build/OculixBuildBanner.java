@@ -56,47 +56,57 @@ public class OculixBuildBanner extends AbstractEventSpy {
 
   // Glyphs sprinkled across the build output. Two flavours:
   //   - Unicode (modern): renders on PowerShell 7, Windows Terminal, macOS
-  //     Terminal, every Linux terminal, VS Code, JetBrains.
-  //   - ASCII (legacy):   fallback for Windows cmd that hasn't been switched
-  //     to UTF-8 (chcp 65001). Without this, the UTF-8 bytes Java emits get
-  //     decoded by cmd as CP850/CP437 → mojibake (e.g. 🦎 prints as ƒªÄ).
+  //     Terminal, every Linux terminal, VS Code, JetBrains, *and* on
+  //     Windows cmd / PowerShell 5.1 once we've forced the console to
+  //     code page 65001 (UTF-8) — see {@link #forceWindowsUtf8Console()}.
+  //   - ASCII (fallback):  used only if forcing UTF-8 failed (sandbox,
+  //     restricted exec, missing cmd.exe, non-Windows but unknown).
   //
-  // We pick the flavour at first use via {@link #legacyConsole()} so users
-  // never have to run chcp themselves. The JVM is forced to UTF-8 via
-  // .mvn/jvm.config so emission is correct on capable terminals.
-  private static final boolean LEGACY = legacyConsole();
-  private static final String GECKO_GLYPH = LEGACY ? "<g>" : "🦎"; // 🦎
-  private static final String OK_GLYPH    = LEGACY ? "(v)" : "✓";       // ✓
-  private static final String NOK_GLYPH   = LEGACY ? "(x)" : "✗";       // ✗
-  private static final String ARROW       = LEGACY ? ">>"  : "▸";       // ▸
+  // The JVM itself is forced to UTF-8 via .mvn/jvm.config so emission is
+  // always correct; the missing piece on Windows is the console output
+  // code page, which we set programmatically below.
+  private static final boolean UTF8_OK = forceWindowsUtf8Console();
+  private static final String GECKO_GLYPH = UTF8_OK ? "🦎" : "<g>"; // 🦎
+  private static final String OK_GLYPH    = UTF8_OK ? "✓"       : "(v)"; // ✓
+  private static final String NOK_GLYPH   = UTF8_OK ? "✗"       : "(x)"; // ✗
+  private static final String ARROW       = UTF8_OK ? "▸"       : ">>";  // ▸
 
   /**
-   * Detect whether we're running on a Windows console that can't render
-   * UTF-8 multi-byte sequences. We treat it as legacy iff: OS is Windows
-   * AND none of the well-known modern-terminal env markers are set.
+   * On Windows, force the console output code page to 65001 (UTF-8) by
+   * spawning {@code cmd /c chcp 65001}. The trick: the console output code
+   * page is a property of the <em>console handle</em>, not the calling
+   * process. The child cmd inherits the parent's console handle, calls
+   * {@code SetConsoleOutputCP(65001)} on it, and exits — but the change
+   * persists on that shared handle, so the parent JVM (Maven) writing
+   * UTF-8 bytes after this point lands in a console that decodes them
+   * correctly. No more mojibake (🦎 → ­ƒªÄ, ▸ → Ôû©).
    *
-   * <p>Markers checked:
-   * <ul>
-   *   <li>{@code WT_SESSION} / {@code WT_PROFILE_ID} — Windows Terminal</li>
-   *   <li>{@code ConEmuPID} — ConEmu / Cmder</li>
-   *   <li>{@code TERM_PROGRAM} — VS Code, JetBrains, iTerm, others</li>
-   *   <li>{@code TERM} — set by mintty / git-bash / cygwin</li>
-   * </ul>
+   * <p>Returns {@code true} if we either don't need to do anything (non-
+   * Windows: console is already UTF-8) or we successfully forced 65001.
+   * Returns {@code false} if the chcp invocation failed, in which case we
+   * stay on safe ASCII glyphs rather than gambling on the encoding.
    *
-   * <p>If none are set on Windows we assume legacy cmd / PowerShell 5.1
-   * launched standalone, which decodes stdout as the active console code
-   * page (typically CP850 in en-US, CP1252 elsewhere) — neither speaks
-   * UTF-8 by default. ASCII glyphs are universally safe there.
+   * <p>Side effect: after the build, the user's shell stays on cp 65001.
+   * That's harmless — modern Windows is fine with 65001 and it's actually
+   * the recommended default on Win10/11.
    */
-  private static boolean legacyConsole() {
+  private static boolean forceWindowsUtf8Console() {
     String os = System.getProperty("os.name", "").toLowerCase();
-    if (!os.contains("win")) return false;
-    if (System.getenv("WT_SESSION") != null) return false;
-    if (System.getenv("WT_PROFILE_ID") != null) return false;
-    if (System.getenv("ConEmuPID") != null) return false;
-    if (System.getenv("TERM_PROGRAM") != null) return false;
-    if (System.getenv("TERM") != null) return false;
-    return true;
+    if (!os.contains("win")) return true;
+    try {
+      ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "chcp", "65001");
+      pb.redirectErrorStream(true);
+      pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+      Process p = pb.start();
+      boolean done = p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS);
+      if (!done) {
+        p.destroyForcibly();
+        return false;
+      }
+      return p.exitValue() == 0;
+    } catch (Throwable t) {
+      return false;
+    }
   }
 
   /** Header banner printed at most once per JVM. */
