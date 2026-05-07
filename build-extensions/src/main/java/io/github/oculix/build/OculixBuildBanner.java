@@ -28,9 +28,10 @@ import javax.inject.Singleton;
  * terminals + Windows Terminal, auto-stripped on legacy cmd that can't
  * render VT100 codes).
  *
- * <p>Glyphs are Unicode on modern terminals (Windows Terminal, PowerShell 7,
- * macOS, Linux, VS Code, JetBrains) and auto-fall-back to 7-bit ASCII on
- * legacy Windows cmd / PowerShell 5.1 — see {@link #legacyConsole()}.
+ * <p>All glyphs are 7-bit ASCII text — the gecko brand is conveyed by the
+ * literal word "Gecko" rather than 🦎 emoji, since Windows consoles can
+ * not be relied on to render UTF-8 multi-byte sequences without the user
+ * setting up code page + font support themselves.
  *
  * @author Julien Mer (julienmerconsulting)
  * @author Claude (Anthropic)
@@ -54,60 +55,14 @@ public class OculixBuildBanner extends AbstractEventSpy {
   private static final String RED   = ESC + "[31m";
   private static final String AMBER = ESC + "[33m";
 
-  // Glyphs sprinkled across the build output. Two flavours:
-  //   - Unicode (modern): renders on PowerShell 7, Windows Terminal, macOS
-  //     Terminal, every Linux terminal, VS Code, JetBrains, *and* on
-  //     Windows cmd / PowerShell 5.1 once we've forced the console to
-  //     code page 65001 (UTF-8) — see {@link #forceWindowsUtf8Console()}.
-  //   - ASCII (fallback):  used only if forcing UTF-8 failed (sandbox,
-  //     restricted exec, missing cmd.exe, non-Windows but unknown).
-  //
-  // The JVM itself is forced to UTF-8 via .mvn/jvm.config so emission is
-  // always correct; the missing piece on Windows is the console output
-  // code page, which we set programmatically below.
-  private static final boolean UTF8_OK = forceWindowsUtf8Console();
-  private static final String GECKO_GLYPH = UTF8_OK ? "🦎" : "<g>"; // 🦎
-  private static final String OK_GLYPH    = UTF8_OK ? "✓"       : "(v)"; // ✓
-  private static final String NOK_GLYPH   = UTF8_OK ? "✗"       : "(x)"; // ✗
-  private static final String ARROW       = UTF8_OK ? "▸"       : ">>";  // ▸
-
-  /**
-   * On Windows, force the console output code page to 65001 (UTF-8) by
-   * spawning {@code cmd /c chcp 65001}. The trick: the console output code
-   * page is a property of the <em>console handle</em>, not the calling
-   * process. The child cmd inherits the parent's console handle, calls
-   * {@code SetConsoleOutputCP(65001)} on it, and exits — but the change
-   * persists on that shared handle, so the parent JVM (Maven) writing
-   * UTF-8 bytes after this point lands in a console that decodes them
-   * correctly. No more mojibake (🦎 → ­ƒªÄ, ▸ → Ôû©).
-   *
-   * <p>Returns {@code true} if we either don't need to do anything (non-
-   * Windows: console is already UTF-8) or we successfully forced 65001.
-   * Returns {@code false} if the chcp invocation failed, in which case we
-   * stay on safe ASCII glyphs rather than gambling on the encoding.
-   *
-   * <p>Side effect: after the build, the user's shell stays on cp 65001.
-   * That's harmless — modern Windows is fine with 65001 and it's actually
-   * the recommended default on Win10/11.
-   */
-  private static boolean forceWindowsUtf8Console() {
-    String os = System.getProperty("os.name", "").toLowerCase();
-    if (!os.contains("win")) return true;
-    try {
-      ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "chcp", "65001");
-      pb.redirectErrorStream(true);
-      pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-      Process p = pb.start();
-      boolean done = p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS);
-      if (!done) {
-        p.destroyForcibly();
-        return false;
-      }
-      return p.exitValue() == 0;
-    } catch (Throwable t) {
-      return false;
-    }
-  }
+  // Pure 7-bit ASCII tokens. Renders identically on every terminal, every
+  // OS, every code page, every font — no UTF-8 negotiation, no chcp dance,
+  // no font-fallback gamble. The gecko brand is carried by the literal
+  // word "Gecko" plus cyan ANSI styling (where ANSI is supported).
+  private static final String GECKO_GLYPH = "Gecko";
+  private static final String OK_GLYPH    = "OK";
+  private static final String NOK_GLYPH   = "KO";
+  private static final String ARROW       = ">";
 
   /** Header banner printed at most once per JVM. */
   private static volatile boolean headerPrinted = false;
