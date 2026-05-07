@@ -52,6 +52,17 @@ public class OculixBuildBanner extends AbstractEventSpy {
   private static final String RED   = ESC + "[31m";
   private static final String AMBER = ESC + "[33m";
 
+  // Unicode glyphs sprinkled across the build output. Render correctly on
+  // modern terminals (PowerShell 7, Windows Terminal, macOS Terminal, every
+  // Linux terminal) and on legacy Windows cmd if the user has run
+  // `chcp 65001` once to switch the console code page to UTF-8.
+  // The JVM is forced to UTF-8 via .mvn/jvm.config so emission is correct
+  // regardless of OS default encoding.
+  private static final String GECKO_GLYPH = "🦎";  // 🦎
+  private static final String OK_GLYPH    = "✓";         // ✓
+  private static final String NOK_GLYPH   = "✗";         // ✗
+  private static final String ARROW       = "▸";         // ▸
+
   /** Header banner printed at most once per JVM. */
   private static volatile boolean headerPrinted = false;
   /** Footer banner printed at most once per JVM. */
@@ -102,14 +113,16 @@ public class OculixBuildBanner extends AbstractEventSpy {
     StringBuilder out = new StringBuilder();
     out.append('\n');
     out.append(CYAN).append(GECKO).append(RESET).append('\n');
-    out.append(BOLD).append(CYAN).append("  OculiX")
-        .append(RESET).append(BOLD).append("  |  Visual Automation IDE")
+    out.append(BOLD).append(CYAN).append("  OculiX  ")
+        .append(GECKO_GLYPH).append("  ").append(RESET)
+        .append(BOLD).append("Visual Automation IDE")
         .append(RESET).append('\n');
     out.append(DIM).append("  visual automation, your way   ::   MIT licensed")
         .append(RESET).append('\n');
     out.append(DIM).append("  https://github.com/oculix-org/Oculix")
         .append(RESET).append('\n');
-    out.append(LIME).append("  >>  preparing build...").append(RESET);
+    out.append(LIME).append("  ").append(ARROW)
+        .append("  preparing build...").append(RESET);
     LOG.info(out.toString());
   }
 
@@ -118,20 +131,20 @@ public class OculixBuildBanner extends AbstractEventSpy {
   private void handleProjectStarted(ExecutionEvent ee) {
     String name = projectName(ee);
     if (name.isEmpty()) return;
-    LOG.info(CYAN + "  >>  gecko inspecting " + BOLD + name + RESET
+    LOG.info(CYAN + "  " + GECKO_GLYPH + "  inspecting " + BOLD + name + RESET
         + DIM + "  ..." + RESET);
   }
 
   private void handleProjectSucceeded(ExecutionEvent ee) {
     String name = projectName(ee);
     if (name.isEmpty()) return;
-    LOG.info(LIME + "  ok  " + RESET + DIM + name + " sealed" + RESET);
+    LOG.info(LIME + "  " + OK_GLYPH + "  " + RESET + DIM + name + " sealed" + RESET);
   }
 
   private void handleProjectFailed(ExecutionEvent ee) {
     String name = projectName(ee);
     if (name.isEmpty()) return;
-    LOG.warn(AMBER + "  xx  " + RESET + name + DIM
+    LOG.warn(AMBER + "  " + NOK_GLYPH + "  " + RESET + name + DIM
         + " not signed off by the gecko" + RESET);
   }
 
@@ -164,7 +177,8 @@ public class OculixBuildBanner extends AbstractEventSpy {
     StringBuilder out = new StringBuilder();
     out.append('\n');
     if (success) {
-      out.append(LIME).append(BOLD).append("  (v)  Build green").append(RESET);
+      out.append(LIME).append(BOLD).append("  ").append(OK_GLYPH)
+          .append("  Build green").append(RESET);
       if (!duration.isEmpty()) {
         out.append(DIM).append("  in ").append(duration).append(RESET);
       }
@@ -172,7 +186,8 @@ public class OculixBuildBanner extends AbstractEventSpy {
       out.append(DIM).append("  ").append(pickLine(SUCCESS_TAGLINES))
           .append(RESET).append('\n');
     } else {
-      out.append(RED).append(BOLD).append("  (x)  Build broken").append(RESET);
+      out.append(RED).append(BOLD).append("  ").append(NOK_GLYPH)
+          .append("  Build broken").append(RESET);
       if (!duration.isEmpty()) {
         out.append(DIM).append("  after ").append(duration).append(RESET);
       }
