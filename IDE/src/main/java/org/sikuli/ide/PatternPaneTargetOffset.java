@@ -154,6 +154,8 @@ class PatternPaneTargetOffset extends JPanel implements
 	  if (zoomInOut == 0) {
       return;
     }
+    // mouse-wheel may fire before async image load completes
+    if (_img == null) return;
     int patW = (int) (getWidth() * _ratio);
     int patH = (int) (_img.getHeight() * _zoomRatio);
     if (zoomInOut < 0) {
@@ -214,6 +216,17 @@ class PatternPaneTargetOffset extends JPanel implements
 	public void paintComponent(Graphics g) {
 		Graphics2D g2d = (Graphics2D) g;
 		if (getWidth() > 0 && getHeight() > 0) {
+			// _img / _match populate from an async findTarget() thread (see ctor).
+			// Paint cycles triggered by initial layout, theme toggle's
+			// updateComponentTreeUI(), or any external repaint can race ahead of
+			// that thread. Show only the spinner until the image is available.
+			if (_img == null) {
+				paintBackground(g2d);
+				synchronized (this) {
+					if (_finding) paintLoading(g2d);
+				}
+				return;
+			}
 			if (_match != null) {
 				zoomToMatch();
 				paintSubScreen(g2d);
@@ -263,6 +276,10 @@ class PatternPaneTargetOffset extends JPanel implements
 	}
 
 	void paintMatch(Graphics2D g2d) {
+		// Defensive: paintComponent gates _img-null cases up-front, but this
+		// method is also reachable from external repaint paths. Same async
+		// load story as paintPatternOnly.
+		if (_img == null) return;
 		int w = (int) (getWidth() * _ratio);
 		int h = (int) ((float) w / _img.getWidth() * _img.getHeight());
 		int x = getWidth() / 2 - w / 2;
@@ -303,6 +320,14 @@ class PatternPaneTargetOffset extends JPanel implements
 	}
 
 	void paintPatternOnly(Graphics g2d) {
+		// _img can be transiently null during init or after a theme/LaF swap
+		// retriggers paint before the image has been re-decoded. Bailing out
+		// quietly is preferable to a NPE that fills the EDT log on every
+		// repaint until the dialog is closed.
+		if (_img == null) {
+			paintBackground(g2d);
+			return;
+		}
 		int patW = (int) (getWidth() * _ratio);
 		_zoomRatio = patW / (float) _img.getWidth();
 		int patH = (int) (_img.getHeight() * _zoomRatio);

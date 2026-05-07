@@ -117,7 +117,11 @@ public class PatternWindow extends JFrame {
 		cp.doLayout();
 		pack();
 		try {
-			_screenshot.setParameters(imgBtn.getFilename(), false, 0.7, -1);
+			// numMatches must be >= 0 — filterMatches() short-circuits on negative
+			// values and never populates _showMatches, leaving the preview stuck on
+			// its loading spinner. Use the cap to "show all matches up to MAX".
+			_screenshot.setParameters(imgBtn.getFilename(), false, 0.7,
+					PatternPaneScreenshot.MAX_NUM_MATCHING);
 		} catch (Exception e) {
       Debug.error(me + "Problem while setting up pattern pane\n%s", e.getMessage());
 		}
