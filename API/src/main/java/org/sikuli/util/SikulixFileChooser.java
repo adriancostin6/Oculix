@@ -160,7 +160,15 @@ public class SikulixFileChooser {
     }
     if (null != result[0]) {
       fileChosen = (File) result[0];
-      PreferencesUser.get().put("LAST_OPEN_DIR", fileChosen.getParent());
+      // Use the shared persistLastDir helper, NOT fileChosen.getParent()
+      // directly. Difference: for a .sikuli BUNDLE pick, fileChosen is the
+      // bundle directory itself — getParent() returns the bundle's PARENT,
+      // i.e. one level too high. The helper checks isDirectory() and stores
+      // the right path in either case (file → parent, dir → self). Without
+      // this, opening a .sikuli bundle made the next dialog land one level
+      // up — symptom: user opens a bundle in C:\Users\DELL\foo.sikuli and
+      // the next File ▸ Open lands at C:\Users\DELL.
+      persistLastDir(fileChosen);
       if (result[1] != null) {
         if (result[1].getClass().equals(SXFilter.class)) {
           SXFilter filter = (SXFilter) result[1];

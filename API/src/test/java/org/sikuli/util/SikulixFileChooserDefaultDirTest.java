@@ -188,6 +188,35 @@ class SikulixFileChooserDefaultDirTest {
         "non-existent parent must not be persisted");
   }
 
+  // ----------------------------------------------- regression: bundle case
+
+  @Test
+  void persistLastDir_bundleDirectoryCase_storesSelf_notParent() throws Exception {
+    // Regression for the "After opening a .sikuli bundle, the next File ▸
+    // Open lands one level too high" bug. Reported scenario:
+    //   user picks  C:\Users\DELL\testsikuli.sikuli  (a directory)
+    //   bug stored  C:\Users\DELL                    (its parent)
+    //   correct     C:\Users\DELL\testsikuli.sikuli  (itself)
+    // The pre-fix processDialog used fileChosen.getParent() unconditionally,
+    // which is one level too high when fileChosen is already a directory.
+    // The fix routes through persistLastDir which checks isDirectory().
+    Path bundleParent = Files.createTempDirectory("oculix-bundle-parent-");
+    Path bundle = Files.createDirectory(bundleParent.resolve("test.sikuli"));
+    try {
+      SikulixFileChooser.persistLastDir(bundle.toFile());
+
+      String stored = PreferencesUser.get().get(PREF_KEY, "");
+      assertEquals(bundle.toFile().getAbsolutePath(), stored,
+          "directory pick must persist the directory itself, not its parent — "
+              + "otherwise picking a .sikuli bundle lands the next dialog one level too high");
+      assertNotEquals(bundleParent.toFile().getAbsolutePath(), stored,
+          "must not store the parent — that was the bug");
+    } finally {
+      Files.deleteIfExists(bundle);
+      Files.deleteIfExists(bundleParent);
+    }
+  }
+
   // ----------------------------------------------------------- round-trip
 
   @Test
