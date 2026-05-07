@@ -114,8 +114,8 @@ public class OculixBuildBanner extends AbstractEventSpy {
     StringBuilder out = new StringBuilder();
     out.append('\n');
     out.append(CYAN).append(GECKO).append(RESET).append('\n');
-    out.append(BOLD).append(CYAN).append("  OculiX  ")
-        .append(GECKO_GLYPH).append("  ").append(RESET)
+    out.append(BOLD).append(CYAN).append("  OculiX").append(RESET)
+        .append(DIM).append("  -  ").append(RESET)
         .append(BOLD).append("Visual Automation IDE")
         .append(RESET).append('\n');
     out.append(DIM).append("  visual automation, your way   ::   MIT licensed")
