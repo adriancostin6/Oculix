@@ -159,7 +159,7 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
       where.y += MAXHEIGHT + 10;
 
       popmenu = new SXDialogPaneImageMenu(where,
-          new String[]{"image"}, options.get(IButton.FILE), this);
+          new String[]{"image", "imgBtn"}, options.get(IButton.FILE), this);
       popmenu.run();
     }
   }
@@ -168,7 +168,7 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
 
   private void handlePreview() {
     Point where = getLocationOnScreen();
-    popwin = new SXDialogPaneImage(where, new String[]{"image"}, options.get(IButton.FILE), this);
+    popwin = new SXDialogPaneImage(where, new String[]{"image", "imgBtn"}, options.get(IButton.FILE), this);
     popwin.run();
   }
 

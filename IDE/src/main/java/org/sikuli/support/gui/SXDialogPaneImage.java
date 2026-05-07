@@ -3,6 +3,7 @@ package org.sikuli.support.gui;
 import org.apache.commons.io.FilenameUtils;
 import org.sikuli.basics.Debug;
 import org.sikuli.ide.EditorImageButton;
+import org.sikuli.ide.PatternWindow;
 import org.sikuli.ide.SikulixIDE;
 import org.sikuli.script.Region;
 import org.sikuli.script.SX;
@@ -76,11 +77,17 @@ public class SXDialogPaneImage extends SXDialogIDE {
 
   public void optimize() {
     closeCancel();
-    prepare();
-    final SXDialogPaneImageOptimize dlgOptimize = new SXDialogPaneImageOptimize(ideWindow.getLocation(),
-        new String[]{"image", "shot"}, image, actualImage, this);
-    dlgOptimize.setText("statusline", "searching... +");
-    dlgOptimize.run();
+    // Hand off to the legacy SikuliX1 PatternWindow restored for OculiX:
+    // multi-tab dialog (Matching preview + TargetOffset) operating on the
+    // EditorImageButton stored in the SXDialog options under the "imgBtn" key.
+    // The screen capture / adjustTo machinery in prepare() is unused here —
+    // PatternWindow takes its own screenshot via takeScreenshot().
+    final Object btn = getOptions().get("imgBtn");
+    if (!(btn instanceof EditorImageButton)) {
+      Debug.error("SXDialogPaneImage.optimize: no EditorImageButton in options (key 'imgBtn')");
+      return;
+    }
+    new PatternWindow(btn);
   }
 
   public void pattern() {
