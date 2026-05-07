@@ -93,7 +93,14 @@ public class CommandArgs {
         .longOpt(anOption.longname())
         .desc(anOption.description());
     if (anOption.hasArgs()) {
-      builder.hasArgs();
+      // Limit each occurrence of an arg-taking flag to ONE value rather than
+      // unlimited. With unlimited (.hasArgs() bare), Apache Commons CLI greedily
+      // consumes everything after the flag until a recognised next flag — and
+      // on some Windows cmd / quoting paths an adjacent "-e" landed inside the
+      // -l value array, which made Commons.hasArg("e") return false and
+      // silently disabled auto-run (#224, reported by @micves).
+      // Multiple files are now passed by repeating the flag: -l A -l B.
+      builder.numberOfArgs(1);
     }
     return builder.build();
   }
