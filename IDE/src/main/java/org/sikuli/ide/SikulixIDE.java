@@ -1451,9 +1451,10 @@ public class SikulixIDE extends JFrame {
       if (files == null || files.length == 0) {
         return;
       }
+      File recycle = new File(scriptFolder, ".recycle");
       for (File image : files) {
         if (!usedImages.contains(image.getName())) {
-          image.delete(); //TODO make a backup??
+          softDeleteToRecycle(image, recycle);
         }
       }
     }
@@ -1464,11 +1465,41 @@ public class SikulixIDE extends JFrame {
         if (files == null || files.length == 0) {
           return;
         }
+        File recycle = new File(screenshotsDir, ".recycle");
         for (File screenshot : files) {
           if (!usedImages.contains(screenshot.getName())) {
-            screenshot.delete();
+            softDeleteToRecycle(screenshot, recycle);
           }
         }
+      }
+    }
+
+    /**
+     * Soft-delete: move the file to a {@code .recycle/} sibling instead of
+     * hard-deleting. cleanBundle() invokes this on every save for any
+     * {@code .png/.jpg/.jpeg} not matched by {@code collectImages}, but the
+     * matcher uses string-literal regex only — dynamically composed filenames
+     * (concat, f-strings, variable interpolation) are missed and would be
+     * lost on save without recovery. Soft-delete keeps a 1-cycle backup so
+     * the user can restore by hand if the matcher rates a false negative.
+     */
+    private void softDeleteToRecycle(File file, File recycleDir) {
+      if (!recycleDir.exists() && !recycleDir.mkdirs()) {
+        // cannot create recycle bin → fall back to hard delete to keep
+        // pre-fix behaviour rather than leaving stale files behind
+        file.delete();
+        return;
+      }
+      File target = new File(recycleDir, file.getName());
+      if (target.exists()) {
+        // Suffix with timestamp on collision so we never overwrite a previous
+        // recycled copy.
+        String stamp = String.valueOf(System.currentTimeMillis());
+        target = new File(recycleDir, file.getName() + "." + stamp);
+      }
+      if (!file.renameTo(target)) {
+        // rename across volumes can fail on some FS — last resort hard delete
+        file.delete();
       }
     }
 
