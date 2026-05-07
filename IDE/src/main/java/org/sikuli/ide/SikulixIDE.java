@@ -621,6 +621,12 @@ public class SikulixIDE extends JFrame {
     SidebarSubmenu sub = new SidebarSubmenu();
     scriptDependentItems.add(sub.addItem("\uD83D\uDCF7  Capture", null,
         e -> btnCapture.captureWithAutoDelay()));
+    // Ins\u00E9rer image \u2014 picks a PNG/JPG from disk, copies it to the script
+    // bundle and inserts the matching code. Same action class as the legacy
+    // toolbar button. Auto-disabled when no script is open via
+    // scriptDependentItems \u2192 no NPE on getActiveContext().getPane().
+    scriptDependentItems.add(sub.addItem("\uD83D\uDDBC\uFE0F  " + _I("btnInsertImageLabel"), null,
+        e -> btnInsertImage.actionPerformed(e)));
     scriptDependentItems.add(sub.addItem("\uD83D\uDD34  Record", null,
         e -> btnRecord.actionPerformed(e)));
     scriptDependentItems.add(sub.addItem("\uD83D\uDFE2  Modern Recorder (beta)", null,
@@ -3458,10 +3464,15 @@ public class SikulixIDE extends JFrame {
   private ButtonRun btnRun;
   private ButtonRunViz btnRunSlow;
   private ButtonRecord btnRecord;
+  // Promoted from a local in initToolbar() so the sidebar Tools submenu can
+  // re-trigger the same action — see buildToolsSubmenu(). The new sidebar UI
+  // doesn't render the legacy top toolbar, so without this exposure the
+  // Insert Image action becomes unreachable from the user's IDE chrome.
+  private ButtonInsertImage btnInsertImage;
 
   private JToolBar initToolbar() {
     JToolBar toolbar = new JToolBar();
-    JButton btnInsertImage = new ButtonInsertImage();
+    btnInsertImage = new ButtonInsertImage();
     JButton btnSubregion = new ButtonSubregion();
     JButton btnLocation = new ButtonLocation();
     JButton btnOffset = new ButtonOffset();
