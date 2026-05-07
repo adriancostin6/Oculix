@@ -242,12 +242,80 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
     return thumb;
   }
 
+  /**
+   * Default similarity baseline for the "As Pattern" promotion. Sikuli's
+   * Pattern() default is 0.7, so picking 0.85 ensures the badge actually
+   * renders (drawDecoration only paints when similarity differs from the
+   * default — at 0.7 there is no visible change).
+   */
+  private static final double AS_PATTERN_DEFAULT_SIMILAR = 0.85;
+  private static final double DEFAULT_SIMILAR = 0.7;
+
+  /**
+   * Track whether the user has explicitly promoted this image to a Pattern
+   * via the "As Pattern" menu action. When true, {@link #toString()} writes
+   * the Pattern(...).similar(...) form instead of the bare quoted filename,
+   * and {@link #paint(Graphics)} paints the green similarity badge.
+   */
+  private boolean _isPattern = false;
+  private double _similar = DEFAULT_SIMILAR;
+
+  /**
+   * Promote this plain image button to a Pattern with a fixed non-default
+   * similarity. Visible feedback: green badge ("85") drawn at the
+   * bottom-right corner. Code-level effect: next File ▸ Save serializes
+   * the surrounding call as {@code Pattern("foo.png").similar(0.85)}
+   * instead of {@code "foo.png"}.
+   *
+   * <p>Idempotent — re-clicking "As Pattern" on an already-promoted button
+   * is a no-op.
+   */
+  public void promoteToPattern() {
+    if (_isPattern) return;
+    _isPattern = true;
+    _similar = AS_PATTERN_DEFAULT_SIMILAR;
+    if (options == null) options = new HashMap<>();
+    final String name = ((File) options.get(IButton.FILE)).getName();
+    options.put(IButton.TEXT, String.format(java.util.Locale.ENGLISH,
+        "Pattern(\"%s\").similar(%.2f)", name, _similar));
+    setButtonText();
+    repaint();
+  }
+
   @Override
   public void paint(Graphics g) {
     super.paint(g);
     Graphics2D g2d = (Graphics2D) g;
     g2d.setColor(new Color(0, 128, 128, 128));
     g2d.drawRoundRect(3, 3, getWidth() - 7, getHeight() - 7, 5, 5);
+    if (_isPattern && _similar != DEFAULT_SIMILAR) {
+      drawSimilarBadge(g2d);
+    }
+  }
+
+  /**
+   * Bottom-right green badge with the similarity percentage (e.g. "85").
+   * Same visual language as {@link EditorPatternButton#drawDecoration} so
+   * users see a consistent indicator regardless of whether the button was
+   * captured by the recorder (EditorImageButton) or by the legacy capture
+   * path (EditorPatternButton).
+   */
+  private void drawSimilarBadge(Graphics2D g2d) {
+    final String label = String.format("%d", (int) (_similar * 100));
+    g2d.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
+        java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    final FontMetrics fm = g2d.getFontMetrics();
+    final int textW = fm.stringWidth(label);
+    final int textH = fm.getAscent();
+    final int padding = 3;
+    final int badgeW = textW + padding * 2;
+    final int badgeH = textH + padding * 2;
+    final int x = getWidth() - badgeW - 1;
+    final int y = getHeight() - badgeH - 1;
+    g2d.setColor(new Color(0, 128, 0, 180));
+    g2d.fillRoundRect(x, y, badgeW, badgeH, 4, 4);
+    g2d.setColor(Color.WHITE);
+    g2d.drawString(label, x + padding, y + padding + textH - 1);
   }
 
   @Override
