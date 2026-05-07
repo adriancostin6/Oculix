@@ -1780,6 +1780,30 @@ public class SikulixIDE extends JFrame {
         try {
           int itemStart = getLineStart((Integer) item.get(IButton.LINE)) + (Integer) item.get(IButton.LOFF);
           int itemLen = ((String) item.get(IButton.TEXT)).length();
+          // Defensive against the historical "Invalid remove" — present in
+          // SikuliX1 too, where it manifested silently as missing thumbnails
+          // on script load. The collectImages() pass works on a snapshot of
+          // pane.getText() taken at method entry; between that snapshot and
+          // the doc.remove() call, the document may have been mutated by
+          // another listener (caret move, theme refresh, async lexer hook,
+          // a parallel reparse triggered from PaneContext.create()), so the
+          // (line, loff, text) tuple computed from the snapshot can point
+          // PAST the live doc end or at content that no longer matches.
+          //
+          // Two guards prevent the BadLocationException explosion:
+          //   1) bounds: itemStart in [0, docLen], itemEnd <= docLen.
+          //   2) content: doc.getText(itemStart, itemLen) must equal the
+          //      TEXT we captured. If it doesn't, a previous swap on the
+          //      same offset already replaced the literal with the "￼"
+          //      placeholder, or the text shifted — either way, skip.
+          if (itemStart < 0 || itemStart + itemLen > doc.getLength()) {
+            continue;
+          }
+          String live = doc.getText(itemStart, itemLen);
+          String expected = (String) item.get(IButton.TEXT);
+          if (!live.equals(expected)) {
+            continue;
+          }
           EditorImageButton button = new EditorImageButton(item);
           javax.swing.text.SimpleAttributeSet attr = new javax.swing.text.SimpleAttributeSet();
           javax.swing.text.StyleConstants.setComponent(attr, button);
