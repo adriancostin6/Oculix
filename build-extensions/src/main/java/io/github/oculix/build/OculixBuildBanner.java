@@ -11,20 +11,16 @@ import javax.inject.Singleton;
 
 /**
  * Maven core extension that prints the OculiX brand banner once per mvn
- * invocation, on the {@code SessionStarted} lifecycle event.
+ * invocation, on the {@code SessionStarted} lifecycle event, plus a status
+ * footer (success / failure / wall-clock duration) on {@code SessionEnded}.
  *
- * <p>Loaded by Maven via {@code .mvn/extensions.xml} which references this
- * artifact ({@code io.github.oculix-org:oculix-build-extensions:&lt;ver&gt;}).
+ * <p>Loaded by Maven via {@code maven.ext.class.path} pointing at the
+ * prebuilt jar in {@code .mvn/extensions/} — no Maven artifact resolution,
+ * works from the very first clone.
  *
- * <p><strong>First-run note:</strong> on a fresh clone the extension jar
- * isn't yet in {@code ~/.m2}. Maven logs a warning, skips the banner, and
- * the reactor proceeds normally — including building this very module so
- * the artifact gets installed. From the second {@code mvn} invocation
- * onwards, the banner appears.
- *
- * <p>The banner emits ANSI color escape codes: cyan for the wordmark and
- * the Maven log surface picks them up natively (Maven 3.5+, JLine/Jansi
- * on Windows since 3.6+).
+ * <p>All glyphs are pure 7-bit ASCII so legacy Windows cmd renders them
+ * cleanly without UTF-8 emoji holes. ANSI color escape codes are handled
+ * by JLine/Jansi which Maven 3.6+ ships with.
  *
  * @author Julien Mer (julienmerconsulting)
  * @author Claude (Anthropic)
@@ -34,53 +30,124 @@ import javax.inject.Singleton;
 @Singleton
 public class OculixBuildBanner extends AbstractEventSpy {
 
-  /** Print at most once per JVM, even if Maven dispatches several SessionStarted events. */
-  private static volatile boolean printed = false;
+  // Bare ESC-prefixed ANSI codes (the leading character is U+001B).
+  // Encoded as actual bytes in the .java file so we don't pay any runtime
+  // String.format / unicode escape cost on every build.
+  private static final String RESET = "[0m";
+  private static final String CYAN  = "[36m";
+  private static final String BOLD  = "[1m";
+  private static final String DIM   = "[2m";
+  private static final String LIME  = "[32m";
+  private static final String RED   = "[31m";
+  private static final String AMBER = "[33m";
+
+  /** Header banner printed at most once per JVM. */
+  private static volatile boolean headerPrinted = false;
+  /** Footer banner printed at most once per JVM. */
+  private static volatile boolean footerPrinted = false;
+  /** Wall-clock millis at SessionStarted, used by the footer to print duration. */
+  private static volatile long startedAt = 0L;
 
   @Override
   public void onEvent(Object event) {
-    if (printed) {
-      return;
-    }
     if (!(event instanceof ExecutionEvent)) {
       return;
     }
     ExecutionEvent ee = (ExecutionEvent) event;
-    if (ee.getType() != ExecutionEvent.Type.SessionStarted) {
-      return;
-    }
-    synchronized (OculixBuildBanner.class) {
-      if (printed) return;
-      printed = true;
-    }
     try {
-      printBanner();
+      switch (ee.getType()) {
+        case SessionStarted:
+          handleStart();
+          break;
+        case SessionEnded:
+          handleEnd(ee);
+          break;
+        default:
+          // ignore other lifecycle events (Mojo*, Project*, ForkStarted, ...)
+      }
     } catch (Throwable t) {
       // Banner is decoration, never let it break the build.
       System.err.println("[oculix-banner] suppressed: " + t.getMessage());
     }
   }
 
-  private void printBanner() {
-    final String reset  = "[0m";
-    final String cyan   = "[36m";
-    final String bold   = "[1m";
-    final String dim    = "[2m";
-    final String lime   = "[32m";
+  private void handleStart() {
+    synchronized (OculixBuildBanner.class) {
+      if (headerPrinted) return;
+      headerPrinted = true;
+      startedAt = System.currentTimeMillis();
+    }
+    StringBuilder out = new StringBuilder();
+    out.append('\n');
+    out.append(CYAN).append(GECKO).append(RESET).append('\n');
+    out.append(BOLD).append(CYAN).append("  OculiX")
+        .append(RESET).append(BOLD).append("  |  Visual Automation IDE")
+        .append(RESET).append('\n');
+    out.append(DIM).append("  visual automation, your way   ::   MIT licensed")
+        .append(RESET).append('\n');
+    out.append(DIM).append("  https://github.com/oculix-org/Oculix")
+        .append(RESET).append('\n');
+    out.append(LIME).append("  >>  preparing build...").append(RESET).append('\n');
+    out.append('\n');
+    System.out.println(out);
+  }
+
+  private void handleEnd(ExecutionEvent ee) {
+    synchronized (OculixBuildBanner.class) {
+      if (footerPrinted) return;
+      footerPrinted = true;
+    }
+    long elapsedMs = startedAt > 0 ? System.currentTimeMillis() - startedAt : -1;
+    String duration = elapsedMs < 0 ? "" : formatDuration(elapsedMs);
+    boolean success = isSuccess(ee);
 
     StringBuilder out = new StringBuilder();
     out.append('\n');
-    out.append(cyan).append(GECKO).append(reset).append('\n');
-    out.append(bold).append(cyan).append("  OculiX")
-        .append(reset).append(bold).append(" — Visual Automation IDE")
-        .append(reset).append('\n');
-    out.append(dim).append("  visual automation, your way   ·   MIT licensed")
-        .append(reset).append('\n');
-    out.append(dim).append("  https://github.com/oculix-org/Oculix")
-        .append(reset).append('\n');
-    out.append(lime).append("  → preparing build…").append(reset).append('\n');
-    out.append('\n');
+    if (success) {
+      out.append(LIME).append(BOLD).append("  (v)  Build green").append(RESET);
+      if (!duration.isEmpty()) {
+        out.append(DIM).append("  in ").append(duration).append(RESET);
+      }
+      out.append('\n');
+      out.append(DIM).append("  ready when you are. ship it.").append(RESET).append('\n');
+    } else {
+      out.append(RED).append(BOLD).append("  (x)  Build broken").append(RESET);
+      if (!duration.isEmpty()) {
+        out.append(DIM).append("  after ").append(duration).append(RESET);
+      }
+      out.append('\n');
+      out.append(AMBER).append("  scroll up, the gecko spotted something.")
+          .append(RESET).append('\n');
+    }
+    out.append(DIM).append("  https://github.com/oculix-org/Oculix")
+        .append(RESET).append('\n');
     System.out.println(out);
+  }
+
+  /**
+   * True if the Maven session completed without exceptions. Defensive on
+   * every access so a Maven internal API change won't crash the footer
+   * (which would scream stderr while the actual build was fine).
+   */
+  private static boolean isSuccess(ExecutionEvent ee) {
+    try {
+      if (ee.getSession() != null && ee.getSession().getResult() != null) {
+        return !ee.getSession().getResult().hasExceptions();
+      }
+    } catch (Throwable ignore) {
+      // fall through to "assume success"
+    }
+    return true;
+  }
+
+  /** Concise human-friendly duration: "850 ms" / "12.3s" / "2m 5s". */
+  private static String formatDuration(long ms) {
+    if (ms < 1000) return ms + " ms";
+    long s = ms / 1000;
+    if (s < 60) return s + "." + ((ms % 1000) / 100) + "s";
+    long m = s / 60;
+    long sr = s % 60;
+    return m + "m " + sr + "s";
   }
 
   /**
