@@ -32,7 +32,24 @@ public class SikulixFileChooser {
   }
 
   private String getLastDir() {
-    return PreferencesUser.get().get("LAST_OPEN_DIR", "");
+    // Order of fallback when no preference is recorded yet (fresh install,
+    // never opened/saved a file in this session):
+    //   1. PreferencesUser "LAST_OPEN_DIR" — set on every successful open / save
+    //   2. user.dir — the JVM's working directory, i.e. where the OculiX jar
+    //      was launched from (Windows: typical user expectation for first
+    //      file chooser)
+    //   3. user.home — last-resort cross-platform anchor
+    // Returning "" leaves it to JFileChooser's default which on Windows is
+    // %USERPROFILE%\Documents and on macOS may pick an arbitrary location.
+    String stored = PreferencesUser.get().get("LAST_OPEN_DIR", "");
+    if (!stored.isEmpty() && new java.io.File(stored).isDirectory()) {
+      return stored;
+    }
+    String jarDir = System.getProperty("user.dir", "");
+    if (!jarDir.isEmpty() && new java.io.File(jarDir).isDirectory()) {
+      return jarDir;
+    }
+    return System.getProperty("user.home", "");
   }
 
   //TODO implement according to SX.doPop
