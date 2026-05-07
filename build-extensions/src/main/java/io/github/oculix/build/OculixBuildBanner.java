@@ -28,7 +28,9 @@ import javax.inject.Singleton;
  * terminals + Windows Terminal, auto-stripped on legacy cmd that can't
  * render VT100 codes).
  *
- * <p>Glyphs are pure 7-bit ASCII; no emoji, no em-dash, no UTF-8 holes.
+ * <p>Glyphs are Unicode on modern terminals (Windows Terminal, PowerShell 7,
+ * macOS, Linux, VS Code, JetBrains) and auto-fall-back to 7-bit ASCII on
+ * legacy Windows cmd / PowerShell 5.1 — see {@link #legacyConsole()}.
  *
  * @author Julien Mer (julienmerconsulting)
  * @author Claude (Anthropic)
@@ -52,16 +54,50 @@ public class OculixBuildBanner extends AbstractEventSpy {
   private static final String RED   = ESC + "[31m";
   private static final String AMBER = ESC + "[33m";
 
-  // Unicode glyphs sprinkled across the build output. Render correctly on
-  // modern terminals (PowerShell 7, Windows Terminal, macOS Terminal, every
-  // Linux terminal) and on legacy Windows cmd if the user has run
-  // `chcp 65001` once to switch the console code page to UTF-8.
-  // The JVM is forced to UTF-8 via .mvn/jvm.config so emission is correct
-  // regardless of OS default encoding.
-  private static final String GECKO_GLYPH = "🦎";  // 🦎
-  private static final String OK_GLYPH    = "✓";         // ✓
-  private static final String NOK_GLYPH   = "✗";         // ✗
-  private static final String ARROW       = "▸";         // ▸
+  // Glyphs sprinkled across the build output. Two flavours:
+  //   - Unicode (modern): renders on PowerShell 7, Windows Terminal, macOS
+  //     Terminal, every Linux terminal, VS Code, JetBrains.
+  //   - ASCII (legacy):   fallback for Windows cmd that hasn't been switched
+  //     to UTF-8 (chcp 65001). Without this, the UTF-8 bytes Java emits get
+  //     decoded by cmd as CP850/CP437 → mojibake (e.g. 🦎 prints as ƒªÄ).
+  //
+  // We pick the flavour at first use via {@link #legacyConsole()} so users
+  // never have to run chcp themselves. The JVM is forced to UTF-8 via
+  // .mvn/jvm.config so emission is correct on capable terminals.
+  private static final boolean LEGACY = legacyConsole();
+  private static final String GECKO_GLYPH = LEGACY ? "<g>" : "🦎"; // 🦎
+  private static final String OK_GLYPH    = LEGACY ? "(v)" : "✓";       // ✓
+  private static final String NOK_GLYPH   = LEGACY ? "(x)" : "✗";       // ✗
+  private static final String ARROW       = LEGACY ? ">>"  : "▸";       // ▸
+
+  /**
+   * Detect whether we're running on a Windows console that can't render
+   * UTF-8 multi-byte sequences. We treat it as legacy iff: OS is Windows
+   * AND none of the well-known modern-terminal env markers are set.
+   *
+   * <p>Markers checked:
+   * <ul>
+   *   <li>{@code WT_SESSION} / {@code WT_PROFILE_ID} — Windows Terminal</li>
+   *   <li>{@code ConEmuPID} — ConEmu / Cmder</li>
+   *   <li>{@code TERM_PROGRAM} — VS Code, JetBrains, iTerm, others</li>
+   *   <li>{@code TERM} — set by mintty / git-bash / cygwin</li>
+   * </ul>
+   *
+   * <p>If none are set on Windows we assume legacy cmd / PowerShell 5.1
+   * launched standalone, which decodes stdout as the active console code
+   * page (typically CP850 in en-US, CP1252 elsewhere) — neither speaks
+   * UTF-8 by default. ASCII glyphs are universally safe there.
+   */
+  private static boolean legacyConsole() {
+    String os = System.getProperty("os.name", "").toLowerCase();
+    if (!os.contains("win")) return false;
+    if (System.getenv("WT_SESSION") != null) return false;
+    if (System.getenv("WT_PROFILE_ID") != null) return false;
+    if (System.getenv("ConEmuPID") != null) return false;
+    if (System.getenv("TERM_PROGRAM") != null) return false;
+    if (System.getenv("TERM") != null) return false;
+    return true;
+  }
 
   /** Header banner printed at most once per JVM. */
   private static volatile boolean headerPrinted = false;
