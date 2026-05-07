@@ -259,8 +259,23 @@ public class RecorderAssistant extends JDialog {
       return;
     }
 
+    // Skip the language header lines (from sikuli import * / Java imports +
+    // class scaffolding / Robot *** Settings ***) when the active script
+    // already contains the language's import marker. Without this gate,
+    // every Insert & Close would append a duplicate header on top of the
+    // recorded actions, corrupting consecutive recordings into the same
+    // script.
+    int startIdx = 0;
+    SikulixIDE ideForScan = (SikulixIDE) getOwner();
+    SikulixIDE.PaneContext scanCtx = ideForScan.getActiveContext();
+    if (scanCtx != null && scanCtx.getPane() != null) {
+      String paneText = scanCtx.getPane().getText();
+      if (paneText != null && paneText.contains(codeGen.getHeaderMarker())) {
+        startIdx = Math.min(codeGen.getHeaderLineCount(), model.size());
+      }
+    }
     StringBuilder code = new StringBuilder("\n");
-    for (int i = 0; i < model.size(); i++) {
+    for (int i = startIdx; i < model.size(); i++) {
       code.append(model.get(i)).append("\n");
     }
     String codeStr = code.toString();

@@ -1337,6 +1337,14 @@ public class SikulixIDE extends JFrame {
       pane.makeReady();
       if (load()) {
         pane.requestFocus();
+        // Convert image filenames present in the loaded text into inline
+        // EditorImageButton thumbnails. reparse() already gates internally on
+        // getShowThumbs(), so this is a no-op when the user has plain-text
+        // mode enabled. Without this call, opening a .py file that references
+        // images in the same folder loads the text but leaves the filenames
+        // un-embedded — visible regression on every IDE start before the
+        // user manually toggled the "Show Thumbs" menu off and on.
+        reparse();
       } else {
         if (lastPos >= 0) {
           tabs.remove(pos);
