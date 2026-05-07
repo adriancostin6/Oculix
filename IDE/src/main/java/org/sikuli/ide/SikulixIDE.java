@@ -1024,14 +1024,14 @@ public class SikulixIDE extends JFrame {
   }
 
   public File selectFileToOpen() {
-    // Set initial directory to workspace or last script location
+    // Initial directory: leave it to SikulixFileChooser.getLastDir which has
+    // a proper fallback chain (LAST_OPEN_DIR pref → user.dir → user.home).
+    // Pre-setting LAST_OPEN_DIR here was overriding the value the previous
+    // chooser had correctly stored (fileChosen.getParent()) with the
+    // grand-parent of the active context's folder — landing the user one
+    // level up from where they last picked a file.
     if (currentWorkspaceDir != null) {
       PreferencesUser.get().put("LAST_OPEN_DIR", currentWorkspaceDir.getAbsolutePath());
-    } else {
-      PaneContext ctx = getActiveContext();
-      if (ctx != null && ctx.getFolder() != null) {
-        PreferencesUser.get().put("LAST_OPEN_DIR", ctx.getFolder().getParentFile().getAbsolutePath());
-      }
     }
     File fileSelected = new SikulixFileChooser(sikulixIDE).open();
     if (fileSelected == null) {
@@ -1041,11 +1041,10 @@ public class SikulixIDE extends JFrame {
   }
 
   public File selectFileForSave(PaneContext context) {
-    // Set initial directory to workspace or script location
+    // Same rationale as selectFileToOpen: respect the chooser's stored value
+    // unless an explicit workspace is set.
     if (currentWorkspaceDir != null) {
       PreferencesUser.get().put("LAST_OPEN_DIR", currentWorkspaceDir.getAbsolutePath());
-    } else if (context.getFolder() != null && context.getFolder().getParentFile() != null) {
-      PreferencesUser.get().put("LAST_OPEN_DIR", context.getFolder().getParentFile().getAbsolutePath());
     }
     File fileSelected = new SikulixFileChooser(sikulixIDE).saveAs(
             context.getExt(), context.isBundle() || context.isTemp());
