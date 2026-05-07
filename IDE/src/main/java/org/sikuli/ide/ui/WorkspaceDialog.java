@@ -100,6 +100,10 @@ public class WorkspaceDialog extends JDialog {
     chooser.setDialogTitle("Choose workspace directory");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
+    // Default landing folder: shared resolver (LAST_OPEN_DIR pref → user.dir
+    // → user.home) so the workspace dialog feels consistent with the script
+    // open / save dialogs and never lands on OS-default %USERPROFILE%.
+    chooser.setCurrentDirectory(org.sikuli.util.SikulixFileChooser.resolveDefaultDir());
 
     int result = chooser.showOpenDialog(this);
     if (result != JFileChooser.APPROVE_OPTION) {

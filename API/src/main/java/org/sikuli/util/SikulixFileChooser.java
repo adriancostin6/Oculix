@@ -31,6 +31,26 @@ public class SikulixFileChooser {
     this.parentFrame = parentFrame;
   }
 
+  /**
+   * Public default-directory resolver shared with any other chooser the IDE
+   * spins up (Workspace dialogs, RecorderImagePicker, etc.). Same fallback
+   * chain as the internal {@link #getLastDir()}: stored {@code LAST_OPEN_DIR}
+   * pref → JVM working dir → user home. Returns a valid {@link File} that
+   * callers can pass to {@code JFileChooser.setCurrentDirectory(...)} without
+   * having to re-implement the cascade.
+   */
+  public static File resolveDefaultDir() {
+    String stored = PreferencesUser.get().get("LAST_OPEN_DIR", "");
+    if (!stored.isEmpty() && new File(stored).isDirectory()) {
+      return new File(stored);
+    }
+    String jarDir = System.getProperty("user.dir", "");
+    if (!jarDir.isEmpty() && new File(jarDir).isDirectory()) {
+      return new File(jarDir);
+    }
+    return new File(System.getProperty("user.home", ""));
+  }
+
   private String getLastDir() {
     // Order of fallback when no preference is recorded yet (fresh install,
     // never opened/saved a file in this session):

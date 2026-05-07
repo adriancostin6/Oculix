@@ -1654,6 +1654,43 @@ public class SikulixIDE extends JFrame {
             srcFolder, dstFolder, copied);
       } else {
         FileUtils.copyFile(currentContext.file, newContext.file);
+        // Same intent as the bundle branch above, but for flat-script saves:
+        // walk the source's text, find every "xxx.png" / "xxx.jpg" reference
+        // it can resolve against the source's image folder, and copy each one
+        // alongside the destination script. Without this, a Save As of a
+        // .py with image-based wait/click leaves the destination orphaned —
+        // the script references files that only exist next to the *original*.
+        File dstDir = newContext.file.getParentFile();
+        if (dstDir == null || !dstDir.isDirectory()) {
+          // Nothing else we can do safely — destination has no resolvable folder.
+          log("PaneContext: copyContent: flat save: no destination folder, image copy skipped");
+          return;
+        }
+        try {
+          String[] text = currentContext.getPane().getText().split("\n");
+          List<Map<String, Object>> images = currentContext.collectImages(text);
+          int copied = 0, skipped = 0;
+          Set<String> seen = new HashSet<>();
+          for (Map<String, Object> image : images) {
+            File src = (File) image.get(IButton.FILE);
+            if (src == null || !src.isFile()) { skipped++; continue; }
+            if (!seen.add(src.getName())) continue; // de-dup multiple references
+            File dst = new File(dstDir, src.getName());
+            try {
+              java.nio.file.Files.copy(src.toPath(), dst.toPath(),
+                  java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+              copied++;
+            } catch (IOException ioex) {
+              log("PaneContext: copyContent: flat save: skipped %s (%s)",
+                  src.getName(), ioex.getMessage());
+              skipped++;
+            }
+          }
+          log("PaneContext: copyContent: flat save: %s -> %s (%d image(s) copied, %d skipped)",
+              currentContext.file, newContext.file, copied, skipped);
+        } catch (Exception ex) {
+          log("PaneContext: copyContent: flat save: image scan failed (%s)", ex.getMessage());
+        }
       }
     }
 
@@ -2224,12 +2261,14 @@ public class SikulixIDE extends JFrame {
     chooser.setDialogTitle("Open Workspace");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
-    // Start in workspace dir or last known location
-    if (currentWorkspaceDir != null) {
+    // Start in current workspace's parent (so user can pick a sibling)
+    // or the shared default-dir resolver (LAST_OPEN_DIR pref → user.dir →
+    // user.home). The previous code only acted on a non-empty pref and
+    // otherwise let JFileChooser fall back to OS default.
+    if (currentWorkspaceDir != null && currentWorkspaceDir.getParentFile() != null) {
       chooser.setCurrentDirectory(currentWorkspaceDir.getParentFile());
     } else {
-      String lastDir = PreferencesUser.get().get("LAST_OPEN_DIR", "");
-      if (!lastDir.isEmpty()) chooser.setCurrentDirectory(new File(lastDir));
+      chooser.setCurrentDirectory(org.sikuli.util.SikulixFileChooser.resolveDefaultDir());
     }
     int result = chooser.showOpenDialog(ideWindow);
     if (result == JFileChooser.APPROVE_OPTION) {
