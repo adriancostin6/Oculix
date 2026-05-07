@@ -259,6 +259,8 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
    */
   private boolean _isPattern = false;
   private double _similar = DEFAULT_SIMILAR;
+  private boolean _exact = false;
+  private Location _offset = null;
 
   /**
    * Promote this plain image button to a Pattern with a fixed non-default
@@ -274,12 +276,35 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
     if (_isPattern) return;
     _isPattern = true;
     _similar = AS_PATTERN_DEFAULT_SIMILAR;
-    if (options == null) options = new HashMap<>();
-    final String name = ((File) options.get(IButton.FILE)).getName();
-    options.put(IButton.TEXT, String.format(java.util.Locale.ENGLISH,
-        "Pattern(\"%s\").similar(%.2f)", name, _similar));
+    rebuildText();
     setButtonText();
     repaint();
+  }
+
+  /**
+   * Recompute the IButton.TEXT serialisation from the current pattern
+   * state. Mirrors EditorPatternButton.toString() so both button types
+   * round-trip identically through File ▸ Save.
+   */
+  private void rebuildText() {
+    if (options == null) options = new HashMap<>();
+    if (options.get(IButton.FILE) == null) return;
+    final String name = ((File) options.get(IButton.FILE)).getName();
+    if (!_isPattern && (_offset == null || (_offset.x == 0 && _offset.y == 0))) {
+      options.put(IButton.TEXT, "\"" + name + "\"");
+      return;
+    }
+    StringBuilder sb = new StringBuilder();
+    sb.append("Pattern(\"").append(name).append("\")");
+    if (_exact) {
+      sb.append(".exact()");
+    } else if (_similar > 0 && _similar != DEFAULT_SIMILAR) {
+      sb.append(String.format(java.util.Locale.ENGLISH, ".similar(%.2f)", _similar));
+    }
+    if (_offset != null && (_offset.x != 0 || _offset.y != 0)) {
+      sb.append(".targetOffset(").append(_offset.x).append(",").append(_offset.y).append(")");
+    }
+    options.put(IButton.TEXT, sb.toString());
   }
 
   @Override
@@ -425,25 +450,78 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
 
   }
 
-  //imgBtn.setParameters(
-  //						_screenshot.isExact(), _screenshot.getSimilarity(),
-  //						_screenshot.getNumMatches()));
+  /**
+   * Apply matching parameters from the Optimize / PatternWindow Apply button.
+   * Returns true if any value actually changed (PatternWindow uses this for
+   * its dirty marker). Called by PatternWindow.actionPerformed at line 304.
+   *
+   * <p>Side effects: pins the button as a Pattern (so the badge paints + the
+   * code serialises as Pattern("foo.png").similar(...)), refreshes the
+   * IButton.TEXT serialisation, repaints. {@code numM} is currently ignored —
+   * EditorImageButton has no Pattern instance to attach numMatches to, but
+   * keeping the signature lets PatternWindow stay agnostic of which button
+   * type it edits.
+   */
   public boolean setParameters(boolean exact, double sim, int numM) {
-    return true;
+    boolean dirty = false;
+    if (_exact != exact) {
+      _exact = exact;
+      dirty = true;
+    }
+    if (Math.abs(_similar - sim) > 1e-6) {
+      _similar = sim;
+      dirty = true;
+    }
+    if (dirty || !_isPattern) {
+      _isPattern = true;
+      rebuildText();
+      setButtonText();
+      repaint();
+      dirty = true;
+    }
+    return dirty;
   }
 
-  //imgBtn.setTargetOffset(_tarOffsetPane.getTargetOffset()))
+  /**
+   * Apply target offset from PatternWindow's TargetOffset tab. Like
+   * setParameters, this also pins the button as a Pattern so the resulting
+   * code is Pattern("foo.png").targetOffset(x,y).
+   */
   public boolean setTargetOffset(Location offset) {
-    return true;
+    boolean dirty;
+    if (offset == null) {
+      dirty = (_offset != null);
+      _offset = null;
+    } else if (_offset == null) {
+      _offset = new Location(offset.x, offset.y);
+      dirty = true;
+    } else {
+      dirty = (_offset.x != offset.x || _offset.y != offset.y);
+      _offset = new Location(offset.x, offset.y);
+    }
+    if (dirty) {
+      _isPattern = true;
+      rebuildText();
+      repaint();
+    }
+    return dirty;
   }
 
-  //imgBtn.getWindow()
   public PatternWindow getWindow() {
     return null;
   }
 
-  //imgBtn.resetParameters()
+  /**
+   * Reset to a plain image (no Pattern wrap). Used by PatternWindow's
+   * cancel/reset path so the user can back out of an unwanted promotion.
+   */
   public void resetParameters() {
-
+    _isPattern = false;
+    _exact = false;
+    _similar = DEFAULT_SIMILAR;
+    _offset = null;
+    rebuildText();
+    setButtonText();
+    repaint();
   }
 }
