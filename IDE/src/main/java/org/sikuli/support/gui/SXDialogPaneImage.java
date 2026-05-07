@@ -1,6 +1,7 @@
 package org.sikuli.support.gui;
 
 import org.apache.commons.io.FilenameUtils;
+import org.sikuli.basics.Debug;
 import org.sikuli.ide.EditorImageButton;
 import org.sikuli.ide.SikulixIDE;
 import org.sikuli.script.Region;
@@ -35,11 +36,25 @@ public class SXDialogPaneImage extends SXDialogIDE {
     final Point center = new Point(
         ideWindow.x + ideWindow.width / 2,
         ideWindow.y + ideWindow.height / 2);
+    // Diag log so we can investigate the "should be on a valid screen"
+    // FATAL when the IDE window is reportedly NOT moved (HiDPI / multi-monitor /
+    // Java 25 bounds quirks). Visible at default Debug.log level.
+    final ScreenDevice[] allScreens = ScreenDevice.get();
+    final StringBuilder bounds = new StringBuilder();
+    for (int i = 0; i < allScreens.length; i++) {
+      if (i > 0) bounds.append(", ");
+      bounds.append("[").append(i).append("]=").append(allScreens[i].asRectangle());
+    }
+    Debug.log(2, "SXDialogPaneImage: prepare(): ideWindow=%s, topLeft=%s, center=%s, screens=%s",
+        ideWindow, ideWindow.getLocation(), center, bounds);
+
     ScreenDevice scr = ScreenDevice.getScreenDeviceForPoint(center);
     if (scr == null) {
+      Debug.log(2, "SXDialogPaneImage: prepare(): center NOT on any screen, trying top-left");
       scr = ScreenDevice.getScreenDeviceForPoint(ideWindow.getLocation());
     }
     if (scr == null) {
+      Debug.log(2, "SXDialogPaneImage: prepare(): top-left NOT on any screen, falling back to primary");
       scr = ScreenDevice.primary();
     }
     if (scr == null) {
