@@ -325,12 +325,14 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
     options.put(IButton.FILE, newFile);
     options.put("image", newFile);
     // The dialog stashed the originating EditorImageButton instance in its
-    // options under "parm1" (cf. SXDialogPaneImage construction at line 171
-    // and SXDialog.setOptions filling unnamed parms as "parmN"). The button's
-    // own internal `options` map is a SEPARATE Map from the dialog's — without
-    // mirroring the rename onto it, the next save would still serialize the
-    // old filename and the tooltip would still show the old name.
-    Object btnObj = options.get("parm1");
+    // options under "imgBtn" — see the construction at EditorImageButton:161
+    // and :171, where the keys array {"image", "imgBtn"} pairs file (parm0)
+    // with this button (parm1) via SXDialog.setOptions naming.
+    // The button's own internal `options` map is a SEPARATE Map from the
+    // dialog's — without mirroring the rename onto it, the next save would
+    // still serialize the old filename and the tooltip would still show
+    // the old name.
+    Object btnObj = options.get("imgBtn");
     if (btnObj instanceof EditorImageButton) {
       EditorImageButton btn = (EditorImageButton) btnObj;
       btn.options.put(IButton.FILE, newFile);
