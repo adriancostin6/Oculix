@@ -51,6 +51,23 @@ public class SikulixFileChooser {
     return new File(System.getProperty("user.home", ""));
   }
 
+  /**
+   * Public companion to {@link #resolveDefaultDir()}: persists the parent
+   * directory of {@code chosen} (or {@code chosen} itself if it is already a
+   * directory) into the {@code LAST_OPEN_DIR} preference. Every chooser in
+   * the IDE — script open/save, workspace new/open, recorder image picker —
+   * should call this on a successful selection so the next dialog anywhere
+   * in the IDE lands at the same place. Without this, the dark-mode build
+   * had inconsistent behaviour: SikulixFileChooser persisted, but raw
+   * JFileChooser sites in WorkspaceDialog / openExistingWorkspace did not.
+   */
+  public static void persistLastDir(File chosen) {
+    if (chosen == null) return;
+    File dir = chosen.isDirectory() ? chosen : chosen.getParentFile();
+    if (dir == null || !dir.isDirectory()) return;
+    PreferencesUser.get().put("LAST_OPEN_DIR", dir.getAbsolutePath());
+  }
+
   private String getLastDir() {
     // Order of fallback when no preference is recorded yet (fresh install,
     // never opened/saved a file in this session):

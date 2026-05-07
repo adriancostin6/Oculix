@@ -2272,7 +2272,10 @@ public class SikulixIDE extends JFrame {
     }
     int result = chooser.showOpenDialog(ideWindow);
     if (result == JFileChooser.APPROVE_OPTION) {
-      loadWorkspace(chooser.getSelectedFile());
+      File picked = chooser.getSelectedFile();
+      // Shared across every chooser in the IDE — see SikulixFileChooser.persistLastDir.
+      org.sikuli.util.SikulixFileChooser.persistLastDir(picked);
+      loadWorkspace(picked);
     }
   }
 

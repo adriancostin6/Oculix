@@ -111,6 +111,10 @@ public class WorkspaceDialog extends JDialog {
     }
 
     workspaceDir = chooser.getSelectedFile();
+    // Persist for the next dialog (any chooser, anywhere in the IDE) so the
+    // global "remember last folder" behaviour is consistent across script
+    // open/save, workspace new/open, recorder image picker.
+    org.sikuli.util.SikulixFileChooser.persistLastDir(workspaceDir);
 
     // Create workspace.json
     try {

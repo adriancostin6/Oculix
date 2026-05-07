@@ -98,14 +98,11 @@ class RecorderImagePicker {
     // then JAR working dir, then user.home. Without this, JFileChooser falls
     // back to the OS profile root, which feels random to users mid-Recorder
     // session.
-    chooser.setCurrentDirectory(resolveInitialDir());
+    chooser.setCurrentDirectory(org.sikuli.util.SikulixFileChooser.resolveDefaultDir());
     if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
       File f = chooser.getSelectedFile();
-      if (f != null && f.getParentFile() != null) {
-        // Persist for the next dialog (Recorder or main IDE) to land here.
-        org.sikuli.basics.PreferencesUser.get().put(
-            "LAST_OPEN_DIR", f.getParentFile().getAbsolutePath());
-      }
+      // Shared resolver — same memory across every chooser in the IDE.
+      org.sikuli.util.SikulixFileChooser.persistLastDir(f);
       try {
         File dest = new File(screenshotDir, f.getName());
         java.nio.file.Files.copy(f.toPath(), dest.toPath(),
@@ -119,14 +116,6 @@ class RecorderImagePicker {
       }
     }
     return null;
-  }
-
-  private static File resolveInitialDir() {
-    String stored = org.sikuli.basics.PreferencesUser.get().get("LAST_OPEN_DIR", "");
-    if (!stored.isEmpty() && new File(stored).isDirectory()) return new File(stored);
-    String jarDir = System.getProperty("user.dir", "");
-    if (!jarDir.isEmpty() && new File(jarDir).isDirectory()) return new File(jarDir);
-    return new File(System.getProperty("user.home", ""));
   }
 
   String pickFromLibrary() {
