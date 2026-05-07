@@ -2335,9 +2335,12 @@ public class SikulixIDE extends JFrame {
     // hitting "-e doesn't auto-run" on Windows can paste the message panel
     // and we know whether -l grabbed -e by mistake (the historical
     // hasArgs-unlimited bug, fixed in CommandArgs.makeOption).
-    log("CLI -l parsed values: %s",
+    // Routed through Commons.startLog at level 3 (always-print, gates only
+    // sub-3 levels) so the line shows in the IDE message panel without the
+    // tester needing -v.
+    Commons.startLog(3, "CLI -l parsed values: %s",
         loadScripts == null ? "null" : java.util.Arrays.toString(loadScripts));
-    log("CLI -e present: %s", Commons.hasArg(CommandArgsEnum.EXECUTE.shortname()));
+    Commons.startLog(3, "CLI -e present: %s", Commons.hasArg(CommandArgsEnum.EXECUTE.shortname()));
     if (loadScripts != null && loadScripts.length > 0) {
       log("Preload given scripts (-l)");
       for (String loadScript : loadScripts) {
