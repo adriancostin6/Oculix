@@ -5,22 +5,30 @@ package io.github.oculix.build;
 
 import org.apache.maven.eventspy.AbstractEventSpy;
 import org.apache.maven.execution.ExecutionEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Maven core extension that prints the OculiX brand banner once per mvn
- * invocation, on the {@code SessionStarted} lifecycle event, plus a status
- * footer (success / failure / wall-clock duration) on {@code SessionEnded}.
+ * Maven core extension that paints OculiX brand presence across the entire
+ * build pipeline. Hooks the EventSpy lifecycle:
  *
- * <p>Loaded by Maven via {@code maven.ext.class.path} pointing at the
- * prebuilt jar in {@code .mvn/extensions/} — no Maven artifact resolution,
- * works from the very first clone.
+ * <ul>
+ *   <li>{@code SessionStarted}  — gecko ASCII header + tagline + lime "preparing build"</li>
+ *   <li>{@code ProjectStarted}  — cyan "gecko inspecting &lt;module&gt;..." marker</li>
+ *   <li>{@code ProjectSucceeded} — dim "&lt;module&gt; sealed" line</li>
+ *   <li>{@code ProjectFailed}   — amber "&lt;module&gt; not signed off" line</li>
+ *   <li>{@code SessionEnded}    — green/red footer with wall-clock duration and a rotating tagline</li>
+ * </ul>
  *
- * <p>All glyphs are pure 7-bit ASCII so legacy Windows cmd renders them
- * cleanly without UTF-8 emoji holes. ANSI color escape codes are handled
- * by JLine/Jansi which Maven 3.6+ ships with.
+ * <p>All output goes through the SLF4J {@link Logger} so Maven's JLine
+ * pipeline can interpret ANSI codes properly (cyan gecko on POSIX
+ * terminals + Windows Terminal, auto-stripped on legacy cmd that can't
+ * render VT100 codes).
+ *
+ * <p>Glyphs are pure 7-bit ASCII; no emoji, no em-dash, no UTF-8 holes.
  *
  * @author Julien Mer (julienmerconsulting)
  * @author Claude (Anthropic)
@@ -30,22 +38,25 @@ import javax.inject.Singleton;
 @Singleton
 public class OculixBuildBanner extends AbstractEventSpy {
 
-  // Bare ESC-prefixed ANSI codes (the leading character is U+001B).
-  // Encoded as actual bytes in the .java file so we don't pay any runtime
-  // String.format / unicode escape cost on every build.
-  private static final String RESET = "[0m";
-  private static final String CYAN  = "[36m";
-  private static final String BOLD  = "[1m";
-  private static final String DIM   = "[2m";
-  private static final String LIME  = "[32m";
-  private static final String RED   = "[31m";
-  private static final String AMBER = "[33m";
+  private static final Logger LOG = LoggerFactory.getLogger("oculix");
+
+  // ANSI styling — encoded via  so the source compiles cleanly and
+  // stays portable. Maven's JLine wrapper handles per-terminal interpretation:
+  // colored on POSIX + Windows Terminal, stripped on legacy cmd.
+  private static final String ESC   = "";
+  private static final String RESET = ESC + "[0m";
+  private static final String CYAN  = ESC + "[36m";
+  private static final String BOLD  = ESC + "[1m";
+  private static final String DIM   = ESC + "[2m";
+  private static final String LIME  = ESC + "[32m";
+  private static final String RED   = ESC + "[31m";
+  private static final String AMBER = ESC + "[33m";
 
   /** Header banner printed at most once per JVM. */
   private static volatile boolean headerPrinted = false;
   /** Footer banner printed at most once per JVM. */
   private static volatile boolean footerPrinted = false;
-  /** Wall-clock millis at SessionStarted, used by the footer to print duration. */
+  /** Wall-clock millis at SessionStarted, used for the footer duration. */
   private static volatile long startedAt = 0L;
 
   @Override
@@ -59,17 +70,28 @@ public class OculixBuildBanner extends AbstractEventSpy {
         case SessionStarted:
           handleStart();
           break;
+        case ProjectStarted:
+          handleProjectStarted(ee);
+          break;
+        case ProjectSucceeded:
+          handleProjectSucceeded(ee);
+          break;
+        case ProjectFailed:
+          handleProjectFailed(ee);
+          break;
         case SessionEnded:
           handleEnd(ee);
           break;
         default:
-          // ignore other lifecycle events (Mojo*, Project*, ForkStarted, ...)
+          // ignore Mojo* / Fork* events — too noisy
       }
     } catch (Throwable t) {
       // Banner is decoration, never let it break the build.
       System.err.println("[oculix-banner] suppressed: " + t.getMessage());
     }
   }
+
+  // ------------------------------------------------------------------ header
 
   private void handleStart() {
     synchronized (OculixBuildBanner.class) {
@@ -87,10 +109,48 @@ public class OculixBuildBanner extends AbstractEventSpy {
         .append(RESET).append('\n');
     out.append(DIM).append("  https://github.com/oculix-org/Oculix")
         .append(RESET).append('\n');
-    out.append(LIME).append("  >>  preparing build...").append(RESET).append('\n');
-    out.append('\n');
-    System.out.println(out);
+    out.append(LIME).append("  >>  preparing build...").append(RESET);
+    LOG.info(out.toString());
   }
+
+  // ----------------------------------------------------- per-project markers
+
+  private void handleProjectStarted(ExecutionEvent ee) {
+    String name = projectName(ee);
+    if (name.isEmpty()) return;
+    LOG.info(CYAN + "  >>  gecko inspecting " + BOLD + name + RESET
+        + DIM + "  ..." + RESET);
+  }
+
+  private void handleProjectSucceeded(ExecutionEvent ee) {
+    String name = projectName(ee);
+    if (name.isEmpty()) return;
+    LOG.info(LIME + "  ok  " + RESET + DIM + name + " sealed" + RESET);
+  }
+
+  private void handleProjectFailed(ExecutionEvent ee) {
+    String name = projectName(ee);
+    if (name.isEmpty()) return;
+    LOG.warn(AMBER + "  xx  " + RESET + name + DIM
+        + " not signed off by the gecko" + RESET);
+  }
+
+  private static String projectName(ExecutionEvent ee) {
+    try {
+      if (ee.getProject() != null) {
+        // Prefer the human "name" tag, fall back to the artifactId.
+        String n = ee.getProject().getName();
+        if (n == null || n.isEmpty()) {
+          n = ee.getProject().getArtifactId();
+        }
+        return n == null ? "" : n;
+      }
+    } catch (Throwable ignore) {
+    }
+    return "";
+  }
+
+  // ------------------------------------------------------------------ footer
 
   private void handleEnd(ExecutionEvent ee) {
     synchronized (OculixBuildBanner.class) {
@@ -120,15 +180,33 @@ public class OculixBuildBanner extends AbstractEventSpy {
       out.append(AMBER).append("  ").append(pickLine(FAILURE_TAGLINES))
           .append(RESET).append('\n');
     }
-    out.append(DIM).append("  https://github.com/oculix-org/Oculix")
-        .append(RESET).append('\n');
-    System.out.println(out);
+    out.append(DIM).append("  https://github.com/oculix-org/Oculix").append(RESET);
+    LOG.info(out.toString());
+  }
+
+  private static boolean isSuccess(ExecutionEvent ee) {
+    try {
+      if (ee.getSession() != null && ee.getSession().getResult() != null) {
+        return !ee.getSession().getResult().hasExceptions();
+      }
+    } catch (Throwable ignore) {
+    }
+    return true;
+  }
+
+  private static String formatDuration(long ms) {
+    if (ms < 1000) return ms + " ms";
+    long s = ms / 1000;
+    if (s < 60) return s + "." + ((ms % 1000) / 100) + "s";
+    long m = s / 60;
+    long sr = s % 60;
+    return m + "m " + sr + "s";
   }
 
   /**
-   * Rotate through a small pool of taglines based on the current millis.
+   * Rotate through a small pool of taglines based on currentTimeMillis().
    * Deterministic-ish per run, varied across runs — gives the build a bit
-   * of personality without being random-spam.
+   * of personality without going random-spam.
    */
   private static String pickLine(String[] pool) {
     if (pool == null || pool.length == 0) return "";
@@ -164,32 +242,6 @@ public class OculixBuildBanner extends AbstractEventSpy {
       "red. the answer is in the logs above.",
       "not green yet. but it will be."
   };
-
-  /**
-   * True if the Maven session completed without exceptions. Defensive on
-   * every access so a Maven internal API change won't crash the footer
-   * (which would scream stderr while the actual build was fine).
-   */
-  private static boolean isSuccess(ExecutionEvent ee) {
-    try {
-      if (ee.getSession() != null && ee.getSession().getResult() != null) {
-        return !ee.getSession().getResult().hasExceptions();
-      }
-    } catch (Throwable ignore) {
-      // fall through to "assume success"
-    }
-    return true;
-  }
-
-  /** Concise human-friendly duration: "850 ms" / "12.3s" / "2m 5s". */
-  private static String formatDuration(long ms) {
-    if (ms < 1000) return ms + " ms";
-    long s = ms / 1000;
-    if (s < 60) return s + "." + ((ms % 1000) / 100) + "s";
-    long m = s / 60;
-    long sr = s % 60;
-    return m + "m " + sr + "s";
-  }
 
   /**
    * The OculiX gecko, hand-pixel'd in dense ASCII. Designed for monospace
