@@ -272,6 +272,17 @@ public class EditorImageButton extends JButton implements ActionListener, Serial
    * <p>Idempotent — re-clicking "As Pattern" on an already-promoted button
    * is a no-op.
    */
+  /**
+   * True once the user has explicitly promoted this image to a Pattern via
+   * the right-click menu or via Optimize Apply. Read by
+   * {@link org.sikuli.support.gui.SXDialogPaneImageMenu} to hide the
+   * "As Pattern" entry from the menu when the promotion already happened —
+   * a stale entry would be confusing dead UI.
+   */
+  public boolean isPromotedToPattern() {
+    return _isPattern;
+  }
+
   public void promoteToPattern() {
     if (_isPattern) return;
     _isPattern = true;
