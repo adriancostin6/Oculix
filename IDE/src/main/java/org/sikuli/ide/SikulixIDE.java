@@ -439,29 +439,8 @@ public class SikulixIDE extends JFrame {
     if (!sikulixIDE.contexts.isEmpty()) {
       sikulixIDE.getActiveContext().focus();
     }
-    if (shouldExecuteOnStart) {
-      Debug.log(3, "-e: auto-running preloaded script");
-      // Defer to a clean EDT pulse so that ideWindow.setVisible(true) above
-      // has had time to fully realise before runCurrentScript hides it again
-      // via doHide(). Reported on #224 (micves) that on Windows the combo
-      // -c -e -l silently failed to fire while -e -l alone worked — most
-      // likely a timing race between the inline runCurrentScript() and the
-      // window-visibility transition. invokeLater unblocks the EDT first,
-      // then re-enters with a fresh queue slot, eliminating the race
-      // without changing semantics on platforms where the inline call
-      // already worked (Linux/macOS reproduce no issue).
-      SwingUtilities.invokeLater(() -> {
-        Debug.log(3, "-e: invoking runCurrentScript()");
-        if (sikulixIDE.btnRun == null) {
-          Debug.error("-e: btnRun not initialised, cannot auto-run");
-          return;
-        }
-        if (sikulixIDE.contexts.isEmpty()) {
-          Debug.error("-e: no preloaded script context, nothing to auto-run");
-          return;
-        }
-        sikulixIDE.btnRun.runCurrentScript();
-      });
+    if (shouldExecuteOnStart && sikulixIDE.getActiveContext() != null) {
+      sikulixIDE.btnRun.runCurrentScript();
     }
   }
 
@@ -2350,6 +2329,10 @@ public class SikulixIDE extends JFrame {
         File f = new File(loadScript);
         if (!f.exists()) {
           log("Preload: file does not exist: %s", loadScript);
+          continue;
+        }
+        if (Runner.getRunner(f.getAbsolutePath()) instanceof InvalidRunner) {
+          log("Preload: unsupported file extension: %s", loadScript);
           continue;
         }
         if (filesToLoad.contains(f)) {
