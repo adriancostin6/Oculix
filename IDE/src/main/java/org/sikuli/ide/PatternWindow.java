@@ -6,7 +6,9 @@ package org.sikuli.ide;
 import org.apache.commons.io.FilenameUtils;
 import org.sikuli.basics.Debug;
 import org.sikuli.script.Location;
+import org.sikuli.script.Screen;
 import org.sikuli.script.ScreenImage;
+import org.sikuli.support.FileManager;
 import org.sikuli.support.devices.ScreenUnion;
 import org.sikuli.support.ide.SikuliIDEI18N;
 
