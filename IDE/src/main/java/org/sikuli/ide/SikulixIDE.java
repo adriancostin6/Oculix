@@ -2331,10 +2331,6 @@ public class SikulixIDE extends JFrame {
           log("Preload: file does not exist: %s", loadScript);
           continue;
         }
-        if (Runner.getRunner(f.getAbsolutePath()) instanceof InvalidRunner) {
-          log("Preload: unsupported file extension: %s", loadScript);
-          continue;
-        }
         if (filesToLoad.contains(f)) {
           continue;
         }
